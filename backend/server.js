@@ -29,6 +29,23 @@ app.use('/api/qr',          require('./routes/qr'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
+// Keep-alive: ping ourselves every 14 minutes so Render's free tier
+// doesn't spin down the server (it sleeps after 15 min of inactivity).
+// This means the first load is always fast, not 30-60 seconds.
+if (process.env.NODE_ENV !== 'development') {
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL?.replace(/\/menu.*/, '');
+  if (SELF_URL) {
+    setInterval(async () => {
+      try {
+        await fetch(`${SELF_URL}/api/health`);
+        console.log('Keep-alive ping sent');
+      } catch (e) {
+        console.log('Keep-alive ping failed:', e.message);
+      }
+    }, 14 * 60 * 1000); // every 14 minutes
+  }
+}
+
 // ── Database connection ───────────────────────────────────────────────────────
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/kistet-ar-menu';
 
