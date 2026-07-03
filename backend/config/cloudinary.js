@@ -13,6 +13,10 @@ async function uploadToCloudinary(buffer, { folder, resourceType = 'image', publ
 
     const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
       if (error) return reject(error);
+      // For raw files, add fl_attachment:false to allow browser to load directly
+      if (resourceType === 'raw') {
+        result.secure_url = result.secure_url.replace('/upload/', '/upload/fl_attachment:false/');
+      }
       resolve(result);
     });
     stream.end(buffer);
