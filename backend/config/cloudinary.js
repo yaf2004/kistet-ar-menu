@@ -9,7 +9,7 @@ async function uploadToCloudinary(buffer, { folder, resourceType = 'image', publ
 
   return new Promise((resolve, reject) => {
     const options = { folder, resource_type: resourceType };
-    if (publicId) options.public_id = publicId;
+    if (publicId) options.public_id = resourceType === 'raw' ? `${publicId}.glb` : publicId;
 
     const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
       if (error) return reject(error);
@@ -19,4 +19,4 @@ async function uploadToCloudinary(buffer, { folder, resourceType = 'image', publ
   });
 }
 
-module.exports = { uploadToCloudinary };
+module.exports = { uploadToCloudinary };s
