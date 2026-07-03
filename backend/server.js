@@ -26,7 +26,20 @@ app.use('/api/restaurants', require('./routes/restaurants'));
 app.use('/api/categories',  require('./routes/categories'));
 app.use('/api/items',       require('./routes/items'));
 app.use('/api/qr',          require('./routes/qr'));
-
+app.get('/api/test-cloudinary', async (req, res) => {
+  try {
+    const cloudinary = require('cloudinary').v2
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    })
+    const result = await cloudinary.api.ping()
+    res.json({ success: true, result })
+  } catch (err) {
+    res.json({ success: false, error: err.message })
+  }
+})
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // Keep-alive: ping ourselves every 14 minutes so Render's free tier
