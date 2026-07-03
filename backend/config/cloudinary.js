@@ -19,4 +19,4 @@ async function uploadToCloudinary(buffer, { folder, resourceType = 'image', publ
   });
 }
 
-module.exports = { uploadToCloudinary };s
+module.exports = { uploadToCloudinary };
