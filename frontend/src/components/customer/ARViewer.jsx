@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 // REAL AR viewer using Google's <model-viewer>. This replaces the old
@@ -12,15 +12,35 @@ import { X } from "lucide-react";
 // we show the dish photo full-screen instead as a graceful fallback.
 export default function ARViewer({ item, onClose }) {
   const viewerRef = useRef(null);
+  const [modelViewerReady, setModelViewerReady] = useState(false);
 
   useEffect(() => {
-    // Loads the <model-viewer> custom element script once, only when needed
-    if (!customElements.get("model-viewer")) {
-      const script = document.createElement("script");
-      script.type = "module";
-      script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
-      document.head.appendChild(script);
+    // Loads the <model-viewer> custom element script once, only when needed.
+    // Also configures the Meshopt decoder — our .glb files are compressed
+    // with EXT_meshopt_compression (via gltf.report), and model-viewer's
+    // GLTFLoader throws "setMeshoptDecoder must be called before loading
+    // compressed files" if this isn't set BEFORE a model-viewer element
+    // gets a src. That's why we gate rendering on modelViewerReady below.
+    const existing = customElements.get("model-viewer");
+    if (existing) {
+      existing.meshoptDecoderLocation =
+        "https://unpkg.com/meshoptimizer@0.18.1/meshopt_decoder.js";
+      setModelViewerReady(true);
+      return;
     }
+
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
+    script.onload = () => {
+      const ModelViewerElement = customElements.get("model-viewer");
+      if (ModelViewerElement) {
+        ModelViewerElement.meshoptDecoderLocation =
+          "https://unpkg.com/meshoptimizer@0.18.1/meshopt_decoder.js";
+      }
+      setModelViewerReady(true);
+    };
+    document.head.appendChild(script);
   }, []);
 
   if (!item) return null;
@@ -43,7 +63,7 @@ export default function ARViewer({ item, onClose }) {
         </button>
       </div>
 
-      {hasModel ? (
+      {hasModel && modelViewerReady ? (
         <>
           {/* eslint-disable-next-line react/no-unknown-property */}
           <model-viewer
@@ -64,6 +84,11 @@ export default function ARViewer({ item, onClose }) {
             </p>
           </div>
         </>
+      ) : hasModel && !modelViewerReady ? (
+        // Model exists but the viewer script/decoder isn't ready yet
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-white/60 text-sm">Loading viewer...</p>
+        </div>
       ) : (
         // Fallback when this item has no 3D model yet — show the photo instead
         // of pretending to offer AR that doesn't exist.
