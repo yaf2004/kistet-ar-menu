@@ -20,6 +20,8 @@ function getAttemptWindow(req) {
   return { keys, expiresAt, now };
 }
 
+// Reserve each attempt atomically before password verification. This avoids
+// a read-then-increment race where concurrent requests could all pass.
 async function increment(key, expiresAt) {
   try {
     return await LoginAttempt.findOneAndUpdate(
@@ -36,24 +38,18 @@ async function increment(key, expiresAt) {
 exports.loginAttemptLimiter = async (req, res, next) => {
   try {
     const window = getAttemptWindow(req);
-    const records = await LoginAttempt.find({ key: { $in: window.keys } }).select('key count').lean();
-    const counts = new Map(records.map((record) => [record.key, record.count]));
-    const ipCount = counts.get(window.keys[0]) || 0;
-    const identityCount = window.keys[1] ? counts.get(window.keys[1]) || 0 : 0;
+    const records = await Promise.all(window.keys.map((key) => increment(key, window.expiresAt)));
+    const ipCount = records[0]?.count || 0;
+    const identityCount = records[1]?.count || 0;
     res.set('RateLimit-Policy', `${IP_IDENTITY_LIMIT};w=900, ${IP_LIMIT};w=900`);
-    if (ipCount >= IP_LIMIT || identityCount >= IP_IDENTITY_LIMIT) {
+    if (ipCount > IP_LIMIT || identityCount > IP_IDENTITY_LIMIT) {
       const retryAfter = Math.max(1, Math.ceil((window.expiresAt.getTime() - window.now) / 1000));
       res.set('Retry-After', String(retryAfter));
-      return res.status(429).json({ error: 'Too many failed login attempts. Please wait before trying again.' });
+      return res.status(429).json({ error: 'Too many login attempts. Please wait before trying again.' });
     }
     req.loginAttemptWindow = window;
     return next();
   } catch (err) { return next(err); }
-};
-
-exports.recordFailedLoginAttempt = async (req) => {
-  const window = req.loginAttemptWindow || getAttemptWindow(req);
-  await Promise.all(window.keys.map((key) => increment(key, window.expiresAt)));
 };
 
 exports.clearLoginAttempts = async (req) => {
