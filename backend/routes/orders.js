@@ -75,12 +75,16 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
 
     const requested = normalizeRequestedItems(req.body.items);
     const ids = [...requested.keys()];
-    const menuItems = await MenuItem.aggregate([
-      { $match: { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, restaurant: restaurant._id, is_available: true } },
-      { $lookup: { from: 'menucategories', localField: 'category_id', foreignField: '_id', as: 'category' } },
-      { $match: { 'category.is_active': true } },
-      { $project: { name: 1, price: 1, is_available: 1 } }
-    ]);
+    const activeCategoryIds = await MenuCategory.find({
+      restaurant: restaurant._id,
+      is_active: true
+    }).distinct('_id');
+    const menuItems = await MenuItem.find({
+      _id: { $in: ids },
+      restaurant: restaurant._id,
+      category_id: { $in: activeCategoryIds },
+      is_available: true
+    }).select('name price is_available').lean();
     if (menuItems.length !== ids.length) {
       return res.status(409).json({ error: 'One or more selected items are unavailable. Refresh the menu and try again.' });
     }
