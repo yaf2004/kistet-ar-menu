@@ -183,6 +183,12 @@ export default function AdminSubscription() {
             </div>
           </section>
           <section className="rounded-2xl border bg-white p-5">
+            <div className="mb-4 flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-700" /><h3 className="font-semibold text-stone-900">Current usage</h3></div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[["Menu items", current.usage?.menuItems, current.plan?.limits?.menuItems], ["Categories", current.usage?.categories, current.plan?.limits?.categories], ["Orders this month", current.usage?.monthlyOrders, current.plan?.limits?.monthlyOrders], ["AR models", current.usage?.arItems, current.plan?.limits?.arItems]].map(([label, used, limit]) => <div key={label} className="rounded-xl border border-stone-100 p-3"><p className="text-xs text-stone-500">{label}</p><p className="mt-1 text-lg font-semibold text-stone-900">{used ?? 0} <span className="text-xs font-normal text-stone-500">/ {limit ?? "—"}</span></p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100"><div className="h-full rounded-full bg-amber-500" style={{ width: `${limit ? Math.min(100, ((used || 0) / limit) * 100) : 0}%` }} /></div></div>)}
+            </div>
+          </section>
+          <section className="rounded-2xl border bg-white p-5">
             <div className="mb-4 flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-700" /><h3 className="font-semibold text-stone-900">Plan limits</h3></div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {[
