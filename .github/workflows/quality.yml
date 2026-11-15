@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   backend:
@@ -20,6 +20,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -30,17 +32,29 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=moderate
       - run: npm test
-      - name: Report dependency lock updates
+      - name: Commit patched backend lockfile
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          node -e "const fs=require('fs');const cp=require('child_process');const before=JSON.parse(cp.execFileSync('git',['show','HEAD:backend/package-lock.json'],{encoding:'utf8'}));const after=JSON.parse(fs.readFileSync('package-lock.json','utf8'));for(const [name,pkg] of Object.entries(after.packages)){if(before.packages[name]?.version!==pkg.version)console.log(name+': '+(before.packages[name]?.version||'absent')+' -> '+pkg.version)}"
+          git -C "$GITHUB_WORKSPACE" add backend/package-lock.json
+          if ! git -C "$GITHUB_WORKSPACE" diff --cached --quiet; then
+            git -C "$GITHUB_WORKSPACE" config user.name "github-actions[bot]"
+            git -C "$GITHUB_WORKSPACE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "$GITHUB_WORKSPACE" commit -m "security(deps): refresh backend lockfile"
+            git -C "$GITHUB_WORKSPACE" push origin "HEAD:$BRANCH_NAME"
+          fi
 
   frontend:
+    needs: backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -50,10 +64,19 @@ jobs:
       - run: npm audit fix --package-lock-only --legacy-peer-deps
       - run: npm ci --legacy-peer-deps
       - run: npm audit --audit-level=moderate
-      - name: Report frontend dependency lock updates
-        run: |
-          node -e "const fs=require('fs');const cp=require('child_process');const before=JSON.parse(cp.execFileSync('git',['show','HEAD:frontend/package-lock.json'],{encoding:'utf8'}));const after=JSON.parse(fs.readFileSync('package-lock.json','utf8'));for(const [name,pkg] of Object.entries(after.packages)){if(before.packages[name]?.version!==pkg.version)console.log(name+': '+(before.packages[name]?.version||'absent')+' -> '+pkg.version)}"
       - run: npm run lint
       - run: npm run build
         env:
           VITE_API_BASE_URL: https://api.example.invalid
+      - name: Commit patched frontend lockfile
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          git -C "$GITHUB_WORKSPACE" add frontend/package-lock.json
+          if ! git -C "$GITHUB_WORKSPACE" diff --cached --quiet; then
+            git -C "$GITHUB_WORKSPACE" config user.name "github-actions[bot]"
+            git -C "$GITHUB_WORKSPACE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "$GITHUB_WORKSPACE" commit -m "security(deps): refresh frontend lockfile"
+            git -C "$GITHUB_WORKSPACE" push origin "HEAD:$BRANCH_NAME"
+          fi
