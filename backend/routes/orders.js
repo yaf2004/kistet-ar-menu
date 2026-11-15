@@ -63,7 +63,7 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
       return res.status(400).json({ error: 'A valid Idempotency-Key header is required' });
     }
 
-    const restaurant = await Restaurant.findOne({ slug, active: true }).select('_id slug currency tables').lean();
+    const restaurant = await Restaurant.findOne({ slug, active: true }).select('_id slug currency tables.tableNumber').lean();
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
 
     const token = makeTrackingToken(restaurant._id, idempotencyKey);
@@ -134,7 +134,8 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
       customerPhone: customerPhone || null,
       notes: notes || null,
       paymentMethod: 'pay_at_restaurant',
-      paymentStatus: 'unpaid'
+      paymentStatus: 'unpaid',
+      statusHistory: [{ status: 'new', at: new Date(), actor: null }]
     });
 
     res.set('Cache-Control', 'no-store');
@@ -161,6 +162,16 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
     return next(err);
   }
 });
+
+function staffOrder(order) {
+  return {
+    ...publicOrder(order),
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    notes: order.notes,
+    statusHistory: order.statusHistory || []
+  };
+}
 
 function publicOrder(order) {
   return {
@@ -204,7 +215,7 @@ router.get('/restaurant/:restaurantId', protect, async (req, res, next) => {
       Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Order.countDocuments(filter)
     ]);
-    return res.json({ orders: orders.map(publicOrder), page, limit, total });
+    return res.json({ orders: orders.map(staffOrder), page, limit, total });
   } catch (err) { return next(err); }
 });
 
@@ -220,8 +231,9 @@ router.patch('/:id/status', protect, async (req, res, next) => {
       return res.status(409).json({ error: `Cannot move an order from ${order.status} to ${String(nextStatus)}` });
     }
     order.status = nextStatus;
+    order.statusHistory.push({ status: nextStatus, actor: req.user._id, at: new Date() });
     await order.save();
-    return res.json(publicOrder(order.toObject()));
+    return res.json(staffOrder(order.toObject()));
   } catch (err) { return next(err); }
 });
 
