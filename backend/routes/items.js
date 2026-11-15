@@ -9,7 +9,7 @@ const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-const MAX_MODEL_BYTES = 4 * 1024 * 1024;
+const MAX_MODEL_BYTES = 15 * 1024 * 1024;
 const editableFields = [
   'category_id', 'name', 'description', 'price', 'is_available',
   'is_featured', 'ar_enabled', 'image_url', 'model_3d_url', 'tags', 'allergens', 'ingredients', 'sort_order'
@@ -24,7 +24,9 @@ const upload = multer({
       ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
     const modelOk = ext === 'glb' && ['model/gltf-binary', 'application/octet-stream'].includes(file.mimetype);
     if (imageOk || modelOk) return cb(null, true);
-    cb(new Error('Unsupported upload. Use JPEG, PNG, WebP, or binary GLB files only.'));
+    const error = new Error('Unsupported upload. Use JPEG, PNG, WebP, or binary GLB files only.');
+    error.status = 400;
+    cb(error);
   }
 });
 
