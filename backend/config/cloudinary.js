@@ -24,7 +24,7 @@ async function uploadToCloudinary(buffer, { folder, resourceType = 'image', publ
       unique_filename: false,
       use_filename: false
     };
-    if (publicId) options.public_id = publicId;
+    if (publicId) options.public_id = resourceType === 'raw' ? `${publicId}.glb` : publicId;
     const stream = client.uploader.upload_stream(options, (error, result) => {
       if (error) return reject(error);
       if (resourceType === 'raw') {
