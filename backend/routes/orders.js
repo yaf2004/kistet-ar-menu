@@ -5,6 +5,7 @@ const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
+const orderCreationLimiter = require('../middleware/orderCreationLimiter');
 
 const transitions = {
   new: ['accepted', 'cancelled'],
@@ -54,7 +55,7 @@ function normalizeRequestedItems(items) {
   return quantities;
 }
 
-router.post('/:slug', async (req, res, next) => {
+router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
   try {
     const slug = String(req.params.slug || '').trim().toLowerCase();
     const idempotencyKey = String(req.get('Idempotency-Key') || req.body.idempotencyKey || '');
