@@ -114,8 +114,10 @@ router.delete('/:id', protect, requireSuperAdmin, async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: 'Invalid restaurant ID' });
     const restaurant = await Restaurant.findById(req.params.id);
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found' });
-    await User.deleteMany({ restaurant: restaurant._id });
-    await restaurant.deleteOne();
+    // Retain orders and menu history for audit, reconciliation, and future reactivation.
+    // Deactivation immediately blocks logins and public menu access.
+    restaurant.active = false;
+    await restaurant.save();
     res.status(204).end();
   } catch (err) { next(err); }
 });
