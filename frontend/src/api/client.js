@@ -1,13 +1,32 @@
 const configuredApiUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const API_BASE_URL = (configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:4000' : '')).replace(/\/$/, '');
 
+let csrfToken = null;
+
 function getToken() {
-  return localStorage.getItem('kistet_token');
+  return null;
 }
 
-function setToken(token) {
-  if (token) localStorage.setItem('kistet_token', token);
-  else localStorage.removeItem('kistet_token');
+function setToken() {
+  // Remove legacy bearer tokens; authentication now uses HttpOnly server cookies.
+  try { localStorage.removeItem('kistet_token'); } catch {}
+}
+
+function setCsrfToken(token) {
+  csrfToken = typeof token === 'string' ? token : null;
+}
+
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+  const response = await fetch(`${API_BASE_URL}/api/auth/csrf`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error('Could not initialize request security. Refresh the page and try again.');
+  const data = await response.json();
+  setCsrfToken(data.csrfToken);
+  return csrfToken;
 }
 
 async function request(path, { method = 'GET', body, isFormData = false, signal } = {}) {
@@ -15,16 +34,20 @@ async function request(path, { method = 'GET', body, isFormData = false, signal 
     throw new Error('The API is not configured. Set VITE_API_BASE_URL to the deployed Kistet backend URL.');
   }
 
+  const normalizedMethod = method.toUpperCase();
   const headers = {};
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) {
+    headers['X-CSRF-Token'] = await ensureCsrfToken();
+  }
   if (!isFormData && body) headers['Content-Type'] = 'application/json';
 
   let res;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      method,
+      method: normalizedMethod,
       headers,
+      credentials: 'include',
+      cache: normalizedMethod === 'GET' ? 'no-store' : 'default',
       body: isFormData ? body : (body ? JSON.stringify(body) : undefined),
       signal
     });
@@ -43,6 +66,7 @@ async function request(path, { method = 'GET', body, isFormData = false, signal 
     error.requestId = data?.requestId;
     throw error;
   }
+  if (data?.csrfToken) setCsrfToken(data.csrfToken);
   return data;
 }
 
@@ -59,4 +83,6 @@ function normalize(value) {
   return result;
 }
 
-export const apiClient = { request, getToken, setToken, normalize };
+setToken();
+
+export const apiClient = { request, getToken, setToken, setCsrfToken, normalize };
