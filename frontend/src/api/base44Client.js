@@ -164,7 +164,7 @@ const integrations = {
         body: formData,
         isFormData: true
       });
-      return { file_url: data.url };
+      return { file_url: data.url, asset_id: data.assetId || null, model_metadata: data.modelMetadata || null };
     }
   }
 };
