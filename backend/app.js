@@ -49,6 +49,10 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb', strict: true }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+app.use((req, res, next) => {
+  if (!req.body || typeof req.body !== 'object') req.body = {};
+  next();
+});
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/restaurants', require('./routes/restaurants'));
