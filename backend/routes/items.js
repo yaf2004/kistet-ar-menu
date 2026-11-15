@@ -224,8 +224,14 @@ router.put('/:id', protect,
           !await validateCategory(data.category_id, existing.restaurant)) {
         return res.status(400).json({ error: 'The selected category does not belong to this restaurant' });
       }
-      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image');
-      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model');
+      if (!isTenantAssetUrl(data.image_url, existing.restaurant, 'image', existing.image_url)) {
+        return res.status(400).json({ error: 'Image must belong to this restaurant\'s asset library' });
+      }
+      if (!isTenantAssetUrl(data.model_3d_url, existing.restaurant, 'model', existing.model_3d_url)) {
+        return res.status(400).json({ error: '3D model must belong to this restaurant\'s asset library' });
+      }
+      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', existing.restaurant);
+      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', existing.restaurant);
       Object.assign(existing, data);
       if (!existing.model_3d_url) existing.ar_enabled = false;
       await existing.save();
