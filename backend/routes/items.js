@@ -51,7 +51,20 @@ function validateFileSignature(file) {
   if (ext === 'jpg' || ext === 'jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (ext === 'png') return b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   if (ext === 'webp') return b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
-  if (ext === 'glb') return b.length >= 12 && b.toString('ascii', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2;
+  if (ext === 'glb') {
+    if (b.length < 20 || b.toString('ascii', 0, 4) !== 'glTF' ||
+        b.readUInt32LE(4) !== 2 || b.readUInt32LE(8) !== b.length) return false;
+    const jsonLength = b.readUInt32LE(12);
+    const jsonType = b.readUInt32LE(16);
+    if (jsonType !== 0x4e4f534a || jsonLength < 2 || 20 + jsonLength > b.length) return false;
+    try {
+      const document = JSON.parse(b.toString('utf8', 20, 20 + jsonLength).replace(/[\\u0000\\u0020]+$/g, ''));
+      if (document.asset?.version !== '2.0') return false;
+      if ((document.buffers || []).some((entry) => entry.uri)) return false;
+      if ((document.images || []).some((entry) => entry.uri && !entry.uri.startsWith('data:'))) return false;
+      return true;
+    } catch { return false; }
+  }
   return false;
 }
 
