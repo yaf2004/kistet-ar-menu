@@ -30,10 +30,6 @@ async function ensureCsrfToken() {
 }
 
 async function request(path, { method = 'GET', body, isFormData = false, signal } = {}) {
-  if (!API_BASE_URL) {
-    throw new Error('The API is not configured. Set VITE_API_BASE_URL to the deployed Kistet backend URL.');
-  }
-
   const normalizedMethod = method.toUpperCase();
   const headers = {};
   if (!['GET', 'HEAD', 'OPTIONS'].includes(normalizedMethod)) {
