@@ -6,6 +6,17 @@ import { Search, Star, Eye, MapPin, Phone, X, Sparkles, AlertTriangle, UtensilsC
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ARViewer from "@/components/customer/ARViewer";
+import CustomerOrdering from "@/components/customer/CustomerOrdering";
+
+function CustomerOrderingBridge(props) {
+  const [cartSeed, setCartSeed] = React.useState(0);
+  React.useEffect(() => {
+    const onAdd = () => setCartSeed((value) => value + 1);
+    window.addEventListener("kistet:add-to-order", onAdd);
+    return () => window.removeEventListener("kistet:add-to-order", onAdd);
+  }, []);
+  return <CustomerOrdering key={cartSeed} {...props} />;
+}
 
 export default function CustomerMenu() {
   const { slug } = useParams();
@@ -409,6 +420,16 @@ export default function CustomerMenu() {
                   </div>
               }
 
+                <Button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("kistet:add-to-order", { detail: selectedItem }));
+                    setSelectedItem(null);
+                  }}
+                  className="w-full rounded-xl h-12 bg-stone-900 hover:bg-stone-800 text-white"
+                >
+                  Add to order
+                </Button>
+
                 {selectedItem.ar_enabled && selectedItem.model_3d_url &&
               <Button
                 onClick={() => {setSelectedItem(null);setArItem(selectedItem);}}
@@ -431,6 +452,13 @@ export default function CustomerMenu() {
         onClose={() => setArItem(null)} />
 
       }
+
+      <CustomerOrderingBridge
+        restaurantSlug={slug}
+        tableNumber={tableNumber}
+        items={items}
+        currency={currency}
+      />
     </div>);
 
 }
