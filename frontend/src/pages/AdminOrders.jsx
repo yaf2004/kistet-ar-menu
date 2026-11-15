@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ClipboardList, RefreshCw, Clock3, ChefHat, CheckCircle2, XCircle } from "lucide-react";
+import { ClipboardList, RefreshCw, ChefHat, CheckCircle2, XCircle } from "lucide-react";
 import { apiClient } from "@/api/client";
 import { useAuth } from "@/lib/AuthContext";
 
