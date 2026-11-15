@@ -45,6 +45,7 @@ function AppRoutes() {
           <Route path="/admin/items" element={<AdminItems />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/qr" element={<AdminQR />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           {/* Super-admin only in practice — page itself returns nothing useful for restaurant_admins */}
           <Route path="/admin/restaurants" element={<AdminRestaurants />} />
