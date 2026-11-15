@@ -8,6 +8,7 @@ const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const uploadRateLimiter = require('../middleware/uploadRateLimiter');
+const { validateGlb } = require('../lib/glbValidation');
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
@@ -55,18 +56,13 @@ function validateFileSignature(file) {
   if (ext === 'png') return b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   if (ext === 'webp') return b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
   if (ext === 'glb') {
-    if (b.length < 20 || b.toString('ascii', 0, 4) !== 'glTF' ||
-        b.readUInt32LE(4) !== 2 || b.readUInt32LE(8) !== b.length) return false;
-    const jsonLength = b.readUInt32LE(12);
-    const jsonType = b.readUInt32LE(16);
-    if (jsonType !== 0x4e4f534a || jsonLength < 2 || 20 + jsonLength > b.length) return false;
     try {
-      const document = JSON.parse(b.toString('utf8', 20, 20 + jsonLength).trim());
-      if (document.asset?.version !== '2.0') return false;
-      if ((document.buffers || []).some((entry) => entry.uri)) return false;
-      if ((document.images || []).some((entry) => entry.uri && !entry.uri.startsWith('data:'))) return false;
+      file.glbMetadata = validateGlb(b);
       return true;
-    } catch { return false; }
+    } catch (error) {
+      file.validationError = error;
+      return false;
+    }
   }
   return false;
 }
@@ -74,7 +70,7 @@ function validateFileSignature(file) {
 async function handleFileUpload(file, kind, restaurantId) {
   if (!file) return null;
   if (!validateFileSignature(file)) {
-    const error = new Error('The uploaded file content does not match its file type');
+    const error = file.validationError || new Error('The uploaded file content does not match its file type');
     error.status = 400;
     throw error;
   }
@@ -131,7 +127,7 @@ router.post('/upload-only', protect, uploadRateLimiter,
       const url = imageFile
         ? await handleFileUpload(imageFile, 'image', restaurantId)
         : await handleFileUpload(modelFile, 'model', restaurantId);
-      res.status(201).json({ url });
+      res.status(201).json({ url, ...(modelFile ? { modelMetadata: modelFile.glbMetadata } : {}) });
     } catch (err) { next(err); }
   }
 );
@@ -202,7 +198,10 @@ router.post('/', protect, uploadRateLimiter,
         return res.status(400).json({ error: '3D model must be uploaded to this restaurant\'s asset library' });
       }
       if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', restaurantId);
-      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', restaurantId);
+      if (req.files?.model3d?.[0]) {
+        data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', restaurantId);
+        data.model_3d_metadata = req.files.model3d[0].glbMetadata;
+      }
       data.ar_enabled = Boolean(data.model_3d_url) && data.ar_enabled !== false && data.ar_enabled !== 'false';
       const item = await MenuItem.create({ ...data, restaurant: restaurantId, name: data.name.trim() });
       res.status(201).json(item);
@@ -249,7 +248,10 @@ router.put('/:id', protect, uploadRateLimiter,
         return res.status(400).json({ error: '3D model must belong to this restaurant\'s asset library' });
       }
       if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', existing.restaurant);
-      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', existing.restaurant);
+      if (req.files?.model3d?.[0]) {
+        data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', existing.restaurant);
+        data.model_3d_metadata = req.files.model3d[0].glbMetadata;
+      }
       Object.assign(existing, data);
       if (!existing.model_3d_url) existing.ar_enabled = false;
       await existing.save();
