@@ -66,7 +66,7 @@ exports.signToken = (id) => jwt.sign(
   getJwtSecret(),
   {
     algorithm: 'HS256',
-    expiresIn: process.env.JWT_EXPIRES || '15m',
+    expiresIn: process.env.JWT_EXPIRES || '12h',
     issuer: process.env.JWT_ISSUER || 'kistet-ar-menu',
     audience: process.env.JWT_AUDIENCE || 'kistet-ar-menu-web'
   }
