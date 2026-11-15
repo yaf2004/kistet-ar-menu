@@ -17,6 +17,14 @@ const developmentOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 app.use((req, res, next) => {
   req.requestId = crypto.randomUUID();
   res.set('X-Request-Id', req.requestId);
+  const startedAt = process.hrtime.bigint();
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    console.info(JSON.stringify({
+      type: 'http_request', requestId: req.requestId, method: req.method,
+      path: req.path, status: res.statusCode, durationMs: Math.round(durationMs * 100) / 100
+    }));
+  });
   next();
 });
 
