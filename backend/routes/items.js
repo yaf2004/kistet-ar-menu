@@ -58,7 +58,7 @@ function validateFileSignature(file) {
     const jsonType = b.readUInt32LE(16);
     if (jsonType !== 0x4e4f534a || jsonLength < 2 || 20 + jsonLength > b.length) return false;
     try {
-      const document = JSON.parse(b.toString('utf8', 20, 20 + jsonLength).replace(/[\\u0000\\u0020]+$/g, ''));
+      const document = JSON.parse(b.toString('utf8', 20, 20 + jsonLength).trim());
       if (document.asset?.version !== '2.0') return false;
       if ((document.buffers || []).some((entry) => entry.uri)) return false;
       if ((document.images || []).some((entry) => entry.uri && !entry.uri.startsWith('data:'))) return false;
