@@ -22,7 +22,7 @@ const upload = multer({
     const ext = file.originalname.split('.').pop().toLowerCase();
     const imageOk = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) &&
       ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
-    const modelOk = ext === 'glb' && file.mimetype === 'model/gltf-binary';
+    const modelOk = ext === 'glb' && ['model/gltf-binary', 'application/octet-stream'].includes(file.mimetype);
     if (imageOk || modelOk) return cb(null, true);
     cb(new Error('Unsupported upload. Use JPEG, PNG, WebP, or binary GLB files only.'));
   }
