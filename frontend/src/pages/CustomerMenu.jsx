@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { API_BASE_URL } from "@/api/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Star, Eye, MapPin, Phone, X, Sparkles, AlertTriangle, UtensilsCrossed } from "lucide-react";
+import { Search, Star, MapPin, Phone, X, Sparkles, AlertTriangle, UtensilsCrossed } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import ARViewer from "@/components/customer/ARViewer";
