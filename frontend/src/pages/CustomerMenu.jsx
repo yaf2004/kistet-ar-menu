@@ -8,16 +8,6 @@ import { Button } from "@/components/ui/button";
 import ARViewer from "@/components/customer/ARViewer";
 import CustomerOrdering from "@/components/customer/CustomerOrdering";
 
-function CustomerOrderingBridge(props) {
-  const [cartSeed, setCartSeed] = React.useState(0);
-  React.useEffect(() => {
-    const onAdd = () => setCartSeed((value) => value + 1);
-    window.addEventListener("kistet:add-to-order", onAdd);
-    return () => window.removeEventListener("kistet:add-to-order", onAdd);
-  }, []);
-  return <CustomerOrdering key={cartSeed} {...props} />;
-}
-
 export default function CustomerMenu() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
@@ -453,7 +443,7 @@ export default function CustomerMenu() {
 
       }
 
-      <CustomerOrderingBridge
+      <CustomerOrdering
         restaurantSlug={slug}
         tableNumber={tableNumber}
         items={items}
