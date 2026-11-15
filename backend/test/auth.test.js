@@ -4,7 +4,8 @@ const {
   canAccessRestaurant,
   requireSuperAdmin,
   scopeToOwnRestaurant,
-  signToken
+  signToken,
+  createCsrfToken
 } = require('../middleware/auth');
 
 test('super administrators can access any restaurant', () => {
@@ -64,4 +65,24 @@ test('signed access tokens carry issuer and audience claims', () => {
     algorithms: ['HS256']
   });
   assert.equal(decoded.sub, 'user-123');
+  assert.equal(decoded.ver, 0);
+});
+
+test('signed sessions carry the current user token version', () => {
+  process.env.JWT_SECRET = 'test-secret-with-at-least-thirty-two-characters';
+  const token = signToken('user-123', 7);
+  const jwt = require('jsonwebtoken');
+  const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+    issuer: 'kistet-ar-menu',
+    audience: 'kistet-ar-menu-web',
+    algorithms: ['HS256']
+  });
+  assert.equal(decoded.ver, 7);
+});
+
+test('CSRF tokens are cryptographically random URL-safe values', () => {
+  const first = createCsrfToken();
+  const second = createCsrfToken();
+  assert.match(first, /^[A-Za-z0-9_-]{40,}$/);
+  assert.notEqual(first, second);
 });
