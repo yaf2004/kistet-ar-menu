@@ -4,7 +4,7 @@ This repository uses a separate Node API and a React frontend. The recommended N
 
 ## 1. Backend service
 
-Deploy the `backend/` directory as a Node 20+ web service. Set:
+Deploy the `backend/` directory as a Node 22+ web service. Set:
 
 - `NODE_ENV=production`
 - `PORT` (provided by the host)
