@@ -66,6 +66,12 @@ app.get('/api/health/live', (req, res) => {
   res.json({ status: 'ok', requestId: req.requestId });
 });
 
+app.get('/api/health/ready', (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.set('Cache-Control', 'no-store');
+  res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'not_ready', database: ready ? 'connected' : 'disconnected', requestId: req.requestId });
+});
+
 app.get('/api/health', (req, res) => {
   const ready = mongoose.connection.readyState === 1;
   res.status(ready ? 200 : 503).json({
