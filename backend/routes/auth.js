@@ -1,19 +1,9 @@
 const router = require('express').Router();
-const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { loginAttemptLimiter } = require('../middleware/loginAttemptLimiter');
-const Restaurant = require('../models/Restaurant');
 const { signToken, protect } = require('../middleware/auth');
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 8,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { error: 'Too many login attempts. Please try again later.' }
-});
-
-router.post('/login', loginLimiter, async (req, res, next) => {
+router.post('/login', loginAttemptLimiter, async (req, res, next) => {
   try {
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
@@ -21,7 +11,9 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email }).select('+password').populate('restaurant', 'name slug active');
+    const user = await User.findOne({ email })
+      .select('+password')
+      .populate('restaurant', 'name slug active');
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
