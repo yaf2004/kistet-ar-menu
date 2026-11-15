@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Restaurant = require('../models/Restaurant');
 const User = require('../models/User');
 const { protect, requireSuperAdmin, canAccessRestaurant } = require('../middleware/auth');
+const { createDefaultTrial } = require('../lib/saasBootstrap');
 
 const restaurantAdminFields = [
   'name', 'description', 'logo_url', 'cover_image_url', 'address', 'phone',
@@ -50,6 +51,7 @@ router.get('/', protect, requireSuperAdmin, async (req, res, next) => {
 
 router.post('/', protect, requireSuperAdmin, async (req, res, next) => {
   let restaurant;
+  let ownerUser;
   try {
     const { name, address, phone, currency, ownerEmail, ownerPassword, ownerName, slug: requestedSlug } = req.body;
     if (typeof name !== 'string' || !name.trim() ||
@@ -77,19 +79,22 @@ router.post('/', protect, requireSuperAdmin, async (req, res, next) => {
     restaurant = await Restaurant.create({
       name: name.trim(), slug, address, phone, currency
     });
-    const ownerUser = await User.create({
+    ownerUser = await User.create({
       name: (typeof ownerName === 'string' && ownerName.trim()) ? ownerName.trim() : `${name.trim()} Admin`,
       email,
       password: ownerPassword,
       role: 'restaurant_admin',
       restaurant: restaurant._id
     });
+    const subscription = await createDefaultTrial(restaurant._id, req.user._id);
 
     res.status(201).json({
       restaurant,
-      owner: { id: ownerUser._id, email: ownerUser.email, name: ownerUser.name }
+      owner: { id: ownerUser._id, email: ownerUser.email, name: ownerUser.name },
+      subscription: { planCode: subscription.planCode, status: subscription.status, trialEndsAt: subscription.trialEndsAt }
     });
   } catch (err) {
+    if (ownerUser?._id) await User.findByIdAndDelete(ownerUser._id).catch(() => {});
     if (restaurant?._id) {
       await Restaurant.findByIdAndDelete(restaurant._id).catch(() => {});
     }
