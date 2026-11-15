@@ -17,6 +17,8 @@ function loadModelViewer() {
       const script = document.createElement("script");
       script.type = "module";
       script.dataset.modelViewer = "true";
+      script.crossOrigin = "anonymous";
+      script.referrerPolicy = "no-referrer";
       script.src = `https://unpkg.com/@google/model-viewer@${MODEL_VIEWER_VERSION}/dist/model-viewer.min.js`;
       script.onload = async () => {
         try {
@@ -54,6 +56,7 @@ export default function ARViewer({ item, onClose }) {
   }, []);
 
   useEffect(() => {
+    setModelLoaded(false);
     const viewer = viewerRef.current;
     if (!viewer) return undefined;
     const onLoad = () => setModelLoaded(true);
@@ -65,6 +68,14 @@ export default function ARViewer({ item, onClose }) {
       viewer.removeEventListener("error", onError);
     };
   }, [modelViewerReady, item?.model_3d_url]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   if (!item) return null;
   const hasModel = Boolean(item.model_3d_url);
@@ -94,16 +105,25 @@ export default function ARViewer({ item, onClose }) {
             ref={viewerRef}
             src={item.model_3d_url}
             alt={item.name}
+            poster={item.image_url || undefined}
             ar
             ar-modes="webxr scene-viewer quick-look"
+            ar-scale="auto"
+            ar-placement="floor"
             camera-controls
+            camera-orbit="0deg 75deg 105%"
             auto-rotate
+            interaction-prompt="auto"
             shadow-intensity="1"
             exposure="1.1"
             loading="eager"
             reveal="auto"
             style={{ width: "100%", height: "100%", backgroundColor: "#0a0a0a" }}
-          />
+          >
+            <button slot="ar-button" className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-stone-900 shadow-xl">
+              View in your space
+            </button>
+          </model-viewer>
           <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent text-center">
             <p className="text-white text-sm font-medium">
               {modelLoaded ? "Rotate and explore the dish. Use the AR control on supported devices to place it on your table." : "Loading 3D model…"}
