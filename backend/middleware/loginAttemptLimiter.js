@@ -35,7 +35,7 @@ exports.loginAttemptLimiter = async (req, res, next) => {
     const keys = [`ip:${hashKey(ip)}:${bucket}`];
     if (email) keys.push(`identity:${hashKey(email)}:${bucket}`);
     const attempts = await Promise.all(keys.map((key) => increment(key, expiresAt)));
-    res.set('RateLimit-Policy', '8;w=900');
+    res.set('RateLimit-Policy', '8;w=900, 30;w=900');
     if (attempts[0].count > 30 || (attempts[1] && attempts[1].count > 8)) {
       res.set('Retry-After', String(Math.max(1, Math.ceil((expiresAt.getTime() - now) / 1000))));
       return res.status(429).json({ error: 'Too many login attempts. Please try again later.' });
