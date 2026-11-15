@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, X, Building2, LogOut } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, X, Building2, LogOut, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -9,6 +9,7 @@ const navItems = [
   { label: "Menu Items", path: "/admin/items", icon: UtensilsCrossed },
   { label: "Categories", path: "/admin/categories", icon: Tags },
   { label: "QR Code", path: "/admin/qr", icon: QrCode },
+  { label: "Orders", path: "/admin/orders", icon: ClipboardList },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
