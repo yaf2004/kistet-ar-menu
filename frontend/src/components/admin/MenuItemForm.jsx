@@ -32,6 +32,8 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { setUploadError('Images must be 4 MB or smaller.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setUploadError('Use a JPEG, PNG, or WebP image.'); return; }
     setUploadingPhoto(true);
     setUploadError('');
     try {
@@ -49,6 +51,8 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const handleModelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { setUploadError('GLB models must be 4 MB or smaller. Optimize the model before uploading.'); return; }
+    if (!file.name.toLowerCase().endsWith('.glb')) { setUploadError('Upload a binary .glb model.'); return; }
     setUploadingModel(true);
     setUploadError('');
     try {
@@ -137,7 +141,7 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           )}
           <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors text-sm text-stone-600">
             <Upload size={16} /> {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleImageUpload} />
           </label>
         </div>
       </div>
