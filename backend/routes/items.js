@@ -17,7 +17,7 @@ const editableFields = [
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_MODEL_BYTES, files: 2, fields: 30, parts: 34 },
+  limits: { fileSize: MAX_MODEL_BYTES, files: 2, fields: 30, parts: 34, fieldNestingDepth: 2, fieldArrayIndexLimit: 100 },
   fileFilter: (req, file, cb) => {
     const ext = file.originalname.split('.').pop().toLowerCase();
     const imageOk = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) &&
