@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const User = require('../models/User');
-const { loginAttemptLimiter, recordFailedLoginAttempt, clearLoginAttempts } = require('../middleware/loginAttemptLimiter');
+const { loginAttemptLimiter, clearLoginAttempts } = require('../middleware/loginAttemptLimiter');
 const {
   signToken,
   protect,
@@ -71,7 +71,6 @@ router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res
       .select('+password')
       .populate('restaurant', 'name slug active');
     if (!user || !(await user.comparePassword(password))) {
-      await recordFailedLoginAttempt(req);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     await clearLoginAttempts(req);
