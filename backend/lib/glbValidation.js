@@ -1,6 +1,5 @@
 const MAX_TRIANGLES = 200000;
 const MAX_VERTICES = 250000;
-const MAX_TEXTURE_DIMENSION = 2048;
 const MAX_EMBEDDED_IMAGE_BYTES = 12 * 1024 * 1024;
 
 function invalid(message) {
@@ -33,7 +32,7 @@ function validateGlb(buffer) {
     if (chunkType === 0x4e4f534a) {
       if (json) throw invalid('The GLB contains more than one JSON chunk.');
       try {
-        json = JSON.parse(buffer.toString('utf8', offset, offset + chunkLength).replace(/[\\u0000\\u0020]+$/g, ''));
+        json = JSON.parse(buffer.toString('utf8', offset, offset + chunkLength).trim());
       } catch {
         throw invalid('The GLB JSON document is malformed.');
       }
@@ -54,13 +53,22 @@ function validateGlb(buffer) {
   if ((json.buffers || []).some((entry) => !Number.isInteger(entry.byteLength) || entry.byteLength > binaryLength)) {
     throw invalid('The GLB binary buffer is missing or has an invalid declared length.');
   }
-  if ((json.images || []).some((entry) => entry.uri && !entry.uri.startsWith('data:'))) {
-    throw invalid('External image files are not supported. Embed textures in the GLB.');
+  if ((json.images || []).some((entry) => {
+    if (entry.uri) return !entry.uri.startsWith('data:');
+    return !Number.isInteger(entry.bufferView) || !json.bufferViews?.[entry.bufferView];
+  })) {
+    throw invalid('External or unreferenced image files are not supported. Embed textures in the GLB.');
   }
 
   const accessors = json.accessors || [];
   const meshes = json.meshes || [];
-  const vertices = accessors.reduce((total, accessor) => total + (accessor.type === 'VEC3' ? Number(accessor.count || 0) : 0), 0);
+  const positionAccessorIds = new Set();
+  for (const mesh of meshes) {
+    for (const primitive of mesh.primitives || []) {
+      if (Number.isInteger(primitive.attributes?.POSITION)) positionAccessorIds.add(primitive.attributes.POSITION);
+    }
+  }
+  const vertices = [...positionAccessorIds].reduce((total, id) => total + Number(accessors[id]?.count || 0), 0);
   let triangles = 0;
   for (const mesh of meshes) {
     for (const primitive of mesh.primitives || []) {
@@ -85,16 +93,6 @@ function validateGlb(buffer) {
   if (triangles > MAX_TRIANGLES) throw invalid(`This model has too many polygons (${triangles.toLocaleString()} triangles). Reduce it to ${MAX_TRIANGLES.toLocaleString()} or fewer.`);
   if (oversizedTexture) throw invalid('A model texture is too large. Resize textures to 2048px or smaller and keep each texture under 12 MB.');
 
-  const dimensions = (json.images || []).map((image) => {
-    const view = json.bufferViews?.[image.bufferView];
-    return view?.extras?.width && view?.extras?.height
-      ? { width: view.extras.width, height: view.extras.height }
-      : null;
-  }).filter(Boolean);
-  if (dimensions.some((size) => size.width > MAX_TEXTURE_DIMENSION || size.height > MAX_TEXTURE_DIMENSION)) {
-    throw invalid('Model textures must be 2048 × 2048 pixels or smaller.');
-  }
-
   return {
     format: 'glb',
     gltfVersion: '2.0',
@@ -110,4 +108,4 @@ function validateGlb(buffer) {
   };
 }
 
-module.exports = { validateGlb, MAX_TRIANGLES, MAX_VERTICES, MAX_TEXTURE_DIMENSION };
+module.exports = { validateGlb, MAX_TRIANGLES, MAX_VERTICES };
