@@ -52,7 +52,7 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const handleModelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) { setUploadError('GLB models must be 15 MB or smaller. Optimize the model before uploading.'); return; }
+    if (file.size > 15 * 1024 * 1024) { setUploadError('GLB models must be 15 MB or smaller. For fast mobile AR, aim for under 5 MB and 50,000 triangles.'); return; }
     if (!file.name.toLowerCase().endsWith('.glb')) { setUploadError('Upload a binary .glb model.'); return; }
     setUploadingModel(true);
     setUploadError('');
