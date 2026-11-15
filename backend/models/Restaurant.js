@@ -1,27 +1,38 @@
 const mongoose = require('mongoose');
 
-// One document per restaurant client. This matches the fields the
-// React frontend's theme system already expects (theme_primary_color, etc.)
 const restaurantSchema = new mongoose.Schema({
-  name:        { type: String, required: true, trim: true },
-  slug:        { type: String, required: true, unique: true, lowercase: true }, // used in the menu URL
-  description: { type: String },
-  logo_url:    { type: String },
-  cover_image_url: { type: String },
-  address:     { type: String },
-  phone:       { type: String },
-  currency:    { type: String, default: '$' },
+  name: { type: String, required: true, trim: true, minlength: 2, maxlength: 160 },
+  slug: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    maxlength: 80
+  },
+  description: { type: String, trim: true, maxlength: 2000 },
+  logo_url: { type: String, trim: true, maxlength: 2048 },
+  cover_image_url: { type: String, trim: true, maxlength: 2048 },
+  address: { type: String, trim: true, maxlength: 500 },
+  phone: { type: String, trim: true, maxlength: 40 },
+  currency: { type: String, trim: true, default: '$', maxlength: 8 },
 
-  // Theme fields — drive the look of the customer menu per restaurant
-  theme_primary_color: { type: String, default: '#d97706' },
-  theme_bg_color:      { type: String, default: '#fafaf9' },
-  theme_card_color:    { type: String, default: '#ffffff' },
-  theme_text_color:    { type: String, default: '#1c1917' },
-  theme_font:          { type: String, default: 'modern' },
-  theme_dark_mode:     { type: Boolean, default: false },
+  theme_primary_color: { type: String, default: '#d97706', match: /^#[0-9a-fA-F]{6}$/ },
+  theme_bg_color: { type: String, default: '#fafaf9', match: /^#[0-9a-fA-F]{6}$/ },
+  theme_card_color: { type: String, default: '#ffffff', match: /^#[0-9a-fA-F]{6}$/ },
+  theme_text_color: { type: String, default: '#1c1917', match: /^#[0-9a-fA-F]{6}$/ },
+  theme_font: { type: String, default: 'modern', trim: true, maxlength: 40 },
+  theme_dark_mode: { type: Boolean, default: false },
 
-  tables:  [{ tableNumber: String, qrUrl: String, qrDataUrl: String }],
-  active:  { type: Boolean, default: true }
-}, { timestamps: true });
+  tables: [{
+    tableNumber: { type: String, required: true, maxlength: 12 },
+    qrUrl: { type: String, required: true, maxlength: 2048 },
+    qrDataUrl: { type: String, required: true, maxlength: 200000 }
+  }],
+  active: { type: Boolean, default: true, index: true }
+}, { timestamps: true, optimisticConcurrency: true });
+
+restaurantSchema.index({ active: 1, slug: 1 });
 
 module.exports = mongoose.model('Restaurant', restaurantSchema);

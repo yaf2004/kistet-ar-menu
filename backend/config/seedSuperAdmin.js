@@ -11,7 +11,8 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const ask = (q) => new Promise((resolve) => rl.question(q, resolve));
 
 async function main() {
-  const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/kistet-ar-menu';
+  const MONGO_URI = process.env.MONGO_URI;
+  if (!MONGO_URI) throw new Error('MONGO_URI is required');
   await mongoose.connect(MONGO_URI);
   console.log('Connected to database.\n');
 
@@ -25,16 +26,18 @@ async function main() {
   console.log('No super admin found yet. Let\'s create your account.\n');
   const name = await ask('Your name: ');
   const email = await ask('Your email (this will be your login): ');
-  const password = await ask('Your password (min 8 characters): ');
+  const password = await ask('Your password (min 12 characters): ');
 
-  if (!name || !email || !password || password.length < 8) {
-    console.log('\nAll fields are required and password must be at least 8 characters. Try again.');
+  if (!name || !email || !password || password.length < 12) {
+    console.log('\nAll fields are required and password must be at least 12 characters. Try again.');
     process.exit(1);
   }
 
   const user = await User.create({ name, email, password, role: 'super_admin', restaurant: null });
   console.log(`\nSuper admin account created: ${user.email}`);
   console.log('You can now log in with these credentials at the admin login page.');
+  await mongoose.disconnect();
+  rl.close();
   process.exit(0);
 }
 

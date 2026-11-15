@@ -13,6 +13,8 @@ import AdminCategories from '@/pages/AdminCategories';
 import AdminQR from '@/pages/AdminQR';
 import AdminSettings from '@/pages/AdminSettings';
 import AdminRestaurants from '@/pages/AdminRestaurants';
+import AdminOrders from '@/pages/AdminOrders';
+import AdminSubscription from '@/pages/AdminSubscription';
 import CustomerMenu from '@/pages/CustomerMenu';
 import Login from '@/pages/Login';
 import Home from '@/pages/Home';
@@ -45,7 +47,9 @@ function AppRoutes() {
           <Route path="/admin/items" element={<AdminItems />} />
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/qr" element={<AdminQR />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/subscription" element={<AdminSubscription />} />
           {/* Super-admin only in practice — page itself returns nothing useful for restaurant_admins */}
           <Route path="/admin/restaurants" element={<AdminRestaurants />} />
         </Route>

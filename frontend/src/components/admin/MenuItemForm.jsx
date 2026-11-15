@@ -20,6 +20,7 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
     tags: item?.tags?.join(", ") || "",
     image_url: item?.image_url || "",
     model_3d_url: item?.model_3d_url || "",
+    model_3d_metadata: item?.model_3d_metadata || null,
     sort_order: item?.sort_order || 0,
     ingredients: item?.ingredients || "",
     allergens: item?.allergens?.join(", ") || "",
@@ -27,14 +28,20 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingModel, setUploadingModel] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 4 * 1024 * 1024) { setUploadError('Images must be 4 MB or smaller.'); return; }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setUploadError('Use a JPEG, PNG, or WebP image.'); return; }
     setUploadingPhoto(true);
+    setUploadError('');
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file, fieldName: "image" });
       setForm(f => ({ ...f, image_url: file_url }));
+    } catch (error) {
+      setUploadError(error.message || 'Image upload failed');
     } finally {
       setUploadingPhoto(false);
     }
@@ -45,10 +52,15 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const handleModelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { setUploadError('GLB models must be 15 MB or smaller. For fast mobile AR, aim for under 5 MB and 50,000 triangles.'); return; }
+    if (!file.name.toLowerCase().endsWith('.glb')) { setUploadError('Upload a binary .glb model.'); return; }
     setUploadingModel(true);
+    setUploadError('');
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file, fieldName: "model3d" });
-      setForm(f => ({ ...f, model_3d_url: file_url, ar_enabled: true }));
+      const { file_url, model_metadata } = await base44.integrations.Core.UploadFile({ file, fieldName: "model3d" });
+      setForm(f => ({ ...f, model_3d_url: file_url, model_3d_metadata: model_metadata || null, ar_enabled: true }));
+    } catch (error) {
+      setUploadError(error.message || '3D model upload failed');
     } finally {
       setUploadingModel(false);
     }
@@ -130,7 +142,7 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           )}
           <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors text-sm text-stone-600">
             <Upload size={16} /> {uploadingPhoto ? "Uploading..." : "Upload Photo"}
-            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleImageUpload} />
           </label>
         </div>
       </div>
@@ -145,16 +157,22 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           {form.model_3d_url && (
             <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
               ✓ Model uploaded
-              <button type="button" onClick={() => setForm(f => ({ ...f, model_3d_url: "", ar_enabled: false }))} className="text-green-900">
+              <button type="button" onClick={() => setForm(f => ({ ...f, model_3d_url: "", model_3d_metadata: null, ar_enabled: false }))} className="text-green-900">
                 <X size={12} />
               </button>
             </div>
           )}
           <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors text-sm text-stone-600">
             <Upload size={16} /> {uploadingModel ? "Uploading..." : "Upload .glb Model"}
-            <input type="file" accept=".glb,.gltf" className="hidden" onChange={handleModelUpload} />
+            <input type="file" accept=".glb" className="hidden" onChange={handleModelUpload} />
           </label>
         </div>
+        {form.model_3d_metadata && (
+          <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
+            <p className="font-semibold">Model validated successfully</p>
+            <p className="mt-1">{Number(form.model_3d_metadata.triangleCount || 0).toLocaleString()} triangles · {Number(form.model_3d_metadata.vertexCount || 0).toLocaleString()} vertices · {(Number(form.model_3d_metadata.fileSizeBytes || 0) / 1024 / 1024).toFixed(1)} MB</p>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-6 pt-2">
@@ -171,6 +189,8 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           <Label className="text-sm">AR Enabled {!form.model_3d_url && <span className="text-stone-400">(upload a model first)</span>}</Label>
         </div>
       </div>
+
+      {uploadError && <p role="alert" className="text-sm text-red-600">{uploadError}</p>}
 
       <div className="flex gap-3 pt-4 border-t">
         <Button type="submit" disabled={saving} className="bg-amber-600 hover:bg-amber-700">

@@ -12,14 +12,6 @@ export const AuthProvider = ({ children }) => {
 
   const checkUserAuth = useCallback(async () => {
     setIsLoadingAuth(true);
-    const token = apiClient.getToken();
-    if (!token) {
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
-      return;
-    }
     try {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
@@ -38,8 +30,8 @@ export const AuthProvider = ({ children }) => {
     checkUserAuth();
   }, [checkUserAuth]);
 
-  const logout = (shouldRedirect = true) => {
-    base44.auth.logout();
+  const logout = async (shouldRedirect = true) => {
+    await base44.auth.logout();
     clearUserCache();
     setUser(null);
     setIsAuthenticated(false);

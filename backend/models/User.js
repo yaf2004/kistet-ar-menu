@@ -1,21 +1,58 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// A User is either:
-//   - a "super_admin" (you, Kistet Creatives) — can see/manage ALL restaurants
-//   - a "restaurant_admin" — can only see/manage the ONE restaurant they're linked to
 const userSchema = new mongoose.Schema({
-  name:     { type: String, required: true },
-  email:    { type: String, required: true, unique: true, lowercase: true },
-  password: { type: String, required: true },
-  role:     { type: String, enum: ['super_admin', 'restaurant_admin'], default: 'restaurant_admin' },
-  restaurant: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', default: null } // null for super_admin
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 2,
+    maxlength: 120
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    maxlength: 254,
+    match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  },
+  password: {
+    type: String,
+    required: true,
+    select: false,
+    minlength: 12
+  },
+  role: {
+    type: String,
+    enum: ['super_admin', 'restaurant_admin'],
+    default: 'restaurant_admin',
+    required: true
+  },
+  tokenVersion: { type: Number, default: 0, min: 0 },
+  restaurant: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    default: null,
+    index: true
+  }
 }, { timestamps: true });
 
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+userSchema.pre('validate', function () {
+  if (this.role === 'restaurant_admin' && !this.restaurant) {
+    this.invalidate('restaurant', 'Restaurant administrators must belong to a restaurant');
+  }
+  if (this.role === 'super_admin' && this.restaurant) {
+    this.invalidate('restaurant', 'Platform administrators cannot be assigned to a restaurant');
+  }
+});
+
+userSchema.pre('save', async function () {
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, 12);
+    this.tokenVersion = (this.tokenVersion || 0) + 1;
+  }
 });
 
 userSchema.methods.comparePassword = function (candidate) {
