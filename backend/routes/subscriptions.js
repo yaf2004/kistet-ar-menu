@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const Plan = require('../models/Plan');
 const Subscription = require('../models/Subscription');
 const Restaurant = require('../models/Restaurant');
+const MenuItem = require('../models/MenuItem');
+const MenuCategory = require('../models/MenuCategory');
+const Order = require('../models/Order');
 const { protect, requireSuperAdmin, canAccessRestaurant } = require('../middleware/auth');
 const { PLAN_DEFINITIONS, subscriptionIsUsable, createTrialDates } = require('../lib/planCatalog');
 
@@ -28,8 +31,21 @@ router.get('/current', protect, async (req, res, next) => {
     const subscription = await Subscription.findOne({ restaurant: restaurantId })
       .populate('plan').populate('restaurant', 'name slug active').lean();
     if (!subscription) return res.status(404).json({ error: 'Subscription not found' });
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const [menuItems, categories, arItems, monthlyOrders] = await Promise.all([
+      MenuItem.countDocuments({ restaurant: restaurantId }),
+      MenuCategory.countDocuments({ restaurant: restaurantId }),
+      MenuItem.countDocuments({ restaurant: restaurantId, ar_enabled: true }),
+      Order.countDocuments({ restaurant: restaurantId, createdAt: { $gte: monthStart } })
+    ]);
     res.set('Cache-Control', 'no-store');
-    res.json({ ...subscription, accessEnabled: subscriptionIsUsable(subscription) });
+    res.json({
+      ...subscription,
+      accessEnabled: subscriptionIsUsable(subscription),
+      usage: { menuItems, categories, arItems, monthlyOrders }
+    });
   } catch (err) { next(err); }
 });
 
