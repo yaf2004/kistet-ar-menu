@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('kistet-dummy-login-password', 12);
 const { loginAttemptLimiter, clearLoginAttempts } = require('../middleware/loginAttemptLimiter');
 const {
   signToken,
@@ -70,7 +72,10 @@ router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res
     const user = await User.findOne({ email })
       .select('+password')
       .populate('restaurant', 'name slug active');
-    if (!user || !(await user.comparePassword(password))) {
+    const passwordMatches = user
+      ? await user.comparePassword(password)
+      : await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+    if (!user || !passwordMatches) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     await clearLoginAttempts(req);
