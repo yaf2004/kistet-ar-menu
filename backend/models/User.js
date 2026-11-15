@@ -30,6 +30,7 @@ const userSchema = new mongoose.Schema({
     default: 'restaurant_admin',
     required: true
   },
+  tokenVersion: { type: Number, default: 0, min: 0 },
   restaurant: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Restaurant',
@@ -50,6 +51,7 @@ userSchema.pre('validate', function () {
 userSchema.pre('save', async function () {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 12);
+    this.tokenVersion = (this.tokenVersion || 0) + 1;
   }
 });
 
