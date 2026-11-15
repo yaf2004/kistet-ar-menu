@@ -77,7 +77,7 @@ async function handleFileUpload(file, kind, restaurantId) {
   }
   const isModel = kind === 'model';
   if (!isModel && file.size > MAX_IMAGE_BYTES) {
-    const error = new Error('Images must be 8 MB or smaller');
+    const error = new Error('Images must be 4 MB or smaller');
     error.status = 413;
     throw error;
   }
