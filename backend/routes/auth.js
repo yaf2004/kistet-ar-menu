@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
+const { loginAttemptLimiter } = require('../middleware/loginAttemptLimiter');
 const Restaurant = require('../models/Restaurant');
 const { signToken, protect } = require('../middleware/auth');
 
