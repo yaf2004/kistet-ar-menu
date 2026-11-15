@@ -12,7 +12,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_MODEL_BYTES = 25 * 1024 * 1024;
 const editableFields = [
   'category_id', 'name', 'description', 'price', 'is_available',
-  'is_featured', 'ar_enabled', 'tags', 'allergens', 'ingredients', 'sort_order'
+  'is_featured', 'ar_enabled', 'image_url', 'model_3d_url', 'tags', 'allergens', 'ingredients', 'sort_order'
 ];
 
 const upload = multer({
@@ -55,7 +55,7 @@ function validateFileSignature(file) {
   return false;
 }
 
-async function handleFileUpload(file, kind) {
+async function handleFileUpload(file, kind, restaurantId) {
   if (!file) return null;
   if (!validateFileSignature(file)) {
     const error = new Error('The uploaded file content does not match its file type');
@@ -69,14 +69,14 @@ async function handleFileUpload(file, kind) {
     throw error;
   }
   const result = await uploadToCloudinary(file.buffer, {
-    folder: isModel ? 'ar-menu/models' : 'ar-menu/dishes',
+    folder: `ar-menu/${restaurantId}/${isModel ? 'models' : 'dishes'}`,
     resourceType: isModel ? 'raw' : 'image',
     publicId: uuidv4()
   });
   return result.secure_url;
 }
 
-async function validateCategory(categoryId, restaurantId) {
+function isTenantAssetUrl(value, restaurantId, kind, existingValue) {\n  if (value === undefined || value === null || value === '') return true;\n  if (existingValue && value === existingValue) return true;\n  try {\n    const url = new URL(value);\n    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;\n    const folder = kind === 'model' ? 'models' : 'dishes';\n    return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com' &&\n      Boolean(cloudName) && url.pathname.includes(`/${cloudName}/`) &&\n      url.pathname.includes(`/ar-menu/${restaurantId}/${folder}/`);\n  } catch { return false; }\n}\n\nasync function validateCategory(categoryId, restaurantId) {
   if (!mongoose.isValidObjectId(categoryId)) return false;
   return Boolean(await MenuCategory.exists({ _id: categoryId, restaurant: restaurantId }));
 }
@@ -100,8 +100,8 @@ router.post('/upload-only', protect,
       if (!imageFile && !modelFile) return res.status(400).json({ error: 'No file uploaded' });
       if (imageFile && modelFile) return res.status(400).json({ error: 'Upload one asset at a time' });
       const url = imageFile
-        ? await handleFileUpload(imageFile, 'image')
-        : await handleFileUpload(modelFile, 'model');
+        ? await handleFileUpload(imageFile, 'image', restaurantId)
+        : await handleFileUpload(modelFile, 'model', restaurantId);
       res.status(201).json({ url });
     } catch (err) { next(err); }
   }
@@ -164,8 +164,8 @@ router.post('/', protect,
       if (!await validateCategory(data.category_id, restaurantId)) {
         return res.status(400).json({ error: 'The selected category does not belong to this restaurant' });
       }
-      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image');
-      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model');
+      if (req.body.image_url && !isTenantAssetUrl(req.body.image_url, restaurantId, 'image')) {\n        return res.status(400).json({ error: 'Image must be uploaded to this restaurant\'s asset library' });\n      }\n      if (req.body.model_3d_url && !isTenantAssetUrl(req.body.model_3d_url, restaurantId, 'model')) {\n        return res.status(400).json({ error: '3D model must be uploaded to this restaurant\'s asset library' });\n      }\n      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', restaurantId);
+      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', restaurantId);
       data.ar_enabled = Boolean(data.model_3d_url) && data.ar_enabled !== false && data.ar_enabled !== 'false';
       const item = await MenuItem.create({ ...data, restaurant: restaurantId, name: data.name.trim() });
       res.status(201).json(item);
