@@ -9,6 +9,6 @@ const categorySchema = new mongoose.Schema({
 }, { timestamps: true, optimisticConcurrency: true });
 
 categorySchema.index({ restaurant: 1, is_active: 1, sort_order: 1 });
-categorySchema.index({ restaurant: 1, name: 1 }, { unique: true });
+categorySchema.index({ restaurant: 1, name: 1 });
 
 module.exports = mongoose.model('MenuCategory', categorySchema);
