@@ -46,13 +46,24 @@ async function start() {
     console.log(`Kistet AR Menu API listening on port ${port}`);
   });
 
+  let shuttingDown = false;
   const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`${signal} received; shutting down gracefully`);
+    const forceExit = setTimeout(() => process.exit(1), 15000);
+    forceExit.unref();
     server.close(async () => {
-      await mongoose.disconnect();
-      process.exit(0);
+      try {
+        await mongoose.disconnect();
+        clearTimeout(forceExit);
+        process.exit(0);
+      } catch (error) {
+        console.error('Graceful shutdown failed:', error.message);
+        process.exit(1);
+      }
     });
-    setTimeout(() => process.exit(1), 10000).unref();
+    server.closeIdleConnections?.();
   };
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
