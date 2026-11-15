@@ -21,6 +21,10 @@ async function start() {
   if (!jwtSecret || jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be configured with at least 32 random characters');
   }
+  if (!process.env.BASE_URL) throw new Error('BASE_URL must be configured to the public frontend origin');
+  if (isProduction && (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET)) {
+    throw new Error('Cloudinary credentials must be configured in production');
+  }
   if (isProduction && !process.env.ALLOWED_ORIGINS) {
     throw new Error('ALLOWED_ORIGINS must contain the exact production frontend origin(s)');
   }
