@@ -76,7 +76,20 @@ async function handleFileUpload(file, kind, restaurantId) {
   return result.secure_url;
 }
 
-function isTenantAssetUrl(value, restaurantId, kind, existingValue) {\n  if (value === undefined || value === null || value === '') return true;\n  if (existingValue && value === existingValue) return true;\n  try {\n    const url = new URL(value);\n    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;\n    const folder = kind === 'model' ? 'models' : 'dishes';\n    return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com' &&\n      Boolean(cloudName) && url.pathname.includes(`/${cloudName}/`) &&\n      url.pathname.includes(`/ar-menu/${restaurantId}/${folder}/`);\n  } catch { return false; }\n}\n\nasync function validateCategory(categoryId, restaurantId) {
+function isTenantAssetUrl(value, restaurantId, kind, existingValue) {
+  if (value === undefined || value === null || value === '') return true;
+  if (existingValue && value === existingValue) return true;
+  try {
+    const url = new URL(value);
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const folder = kind === 'model' ? 'models' : 'dishes';
+    return url.protocol === 'https:' && url.hostname === 'res.cloudinary.com' &&
+      Boolean(cloudName) && url.pathname.includes(`/${cloudName}/`) &&
+      url.pathname.includes(`/ar-menu/${restaurantId}/${folder}/`);
+  } catch { return false; }
+}
+
+async function validateCategory(categoryId, restaurantId) {
   if (!mongoose.isValidObjectId(categoryId)) return false;
   return Boolean(await MenuCategory.exists({ _id: categoryId, restaurant: restaurantId }));
 }
@@ -164,7 +177,13 @@ router.post('/', protect,
       if (!await validateCategory(data.category_id, restaurantId)) {
         return res.status(400).json({ error: 'The selected category does not belong to this restaurant' });
       }
-      if (req.body.image_url && !isTenantAssetUrl(req.body.image_url, restaurantId, 'image')) {\n        return res.status(400).json({ error: 'Image must be uploaded to this restaurant\'s asset library' });\n      }\n      if (req.body.model_3d_url && !isTenantAssetUrl(req.body.model_3d_url, restaurantId, 'model')) {\n        return res.status(400).json({ error: '3D model must be uploaded to this restaurant\'s asset library' });\n      }\n      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', restaurantId);
+      if (req.body.image_url && !isTenantAssetUrl(req.body.image_url, restaurantId, 'image')) {
+        return res.status(400).json({ error: 'Image must be uploaded to this restaurant\'s asset library' });
+      }
+      if (req.body.model_3d_url && !isTenantAssetUrl(req.body.model_3d_url, restaurantId, 'model')) {
+        return res.status(400).json({ error: '3D model must be uploaded to this restaurant\'s asset library' });
+      }
+      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', restaurantId);
       if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', restaurantId);
       data.ar_enabled = Boolean(data.model_3d_url) && data.ar_enabled !== false && data.ar_enabled !== 'false';
       const item = await MenuItem.create({ ...data, restaurant: restaurantId, name: data.name.trim() });
