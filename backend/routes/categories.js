@@ -2,6 +2,7 @@ const router = require('express').Router();
 const mongoose = require('mongoose');
 const MenuCategory = require('../models/MenuCategory');
 const MenuItem = require('../models/MenuItem');
+const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 
 const editableFields = ['name', 'description', 'sort_order', 'is_active'];
@@ -16,6 +17,9 @@ router.get('/public/:restaurantId', async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.restaurantId)) {
       return res.status(400).json({ error: 'Invalid restaurant ID' });
+    }
+    if (!await Restaurant.exists({ _id: req.params.restaurantId, active: true })) {
+      return res.status(404).json({ error: 'Restaurant not found' });
     }
     const cats = await MenuCategory.find({
       restaurant: req.params.restaurantId,
