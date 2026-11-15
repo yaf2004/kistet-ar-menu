@@ -6,7 +6,8 @@ const models = [
   require('./models/Restaurant'),
   require('./models/MenuItem'),
   require('./models/MenuCategory'),
-  require('./models/LoginAttempt')
+  require('./models/LoginAttempt'),
+  require('./models/Order')
 ];
 
 async function start() {
