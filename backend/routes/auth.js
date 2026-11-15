@@ -80,7 +80,7 @@ router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res
     }
 
     const csrfToken = createCsrfToken();
-    setSessionCookies(res, signToken(user._id), csrfToken);
+    setSessionCookies(res, signToken(user._id, user.tokenVersion || 0), csrfToken);
     res.set('Cache-Control', 'no-store');
     return res.json({
       csrfToken,
@@ -95,10 +95,13 @@ router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res
   } catch (err) { return next(err); }
 });
 
-router.post('/logout', protect, (req, res) => {
-  clearSessionCookies(res);
+router.post('/logout', protect, async (req, res, next) => {
+  try {
+    await User.updateOne({ _id: req.user._id }, { $inc: { tokenVersion: 1 } });
+    clearSessionCookies(res);
   res.set('Cache-Control', 'no-store');
-  return res.status(204).end();
+    return res.status(204).end();
+  } catch (err) { return next(err); }
 });
 
 router.get('/me', protect, async (req, res, next) => {
