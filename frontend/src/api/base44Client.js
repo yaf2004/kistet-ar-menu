@@ -47,7 +47,7 @@ const auth = {
       method: 'POST',
       body: { email, password }
     });
-    apiClient.setToken(data.token);
+    apiClient.setCsrfToken(data.csrfToken);
     cachedUser = data.user;
     return data.user;
   },
@@ -58,8 +58,8 @@ const auth = {
   },
 
   logout() {
-    apiClient.setToken(null);
     cachedUser = null;
+    return apiClient.request('/api/auth/logout', { method: 'POST' }).catch(() => {});
   },
 
   // Kept as a no-op stub so Login.jsx doesn't crash if Google button is clicked —
@@ -159,14 +159,11 @@ const integrations = {
       formData.append('restaurant', restaurantId || '');
       // We reuse the items upload endpoint's file handling by uploading
       // through a lightweight dedicated endpoint:
-      const token = apiClient.getToken();
-      const res = await fetch(`${API_BASE_URL}/api/items/upload-only`, {
+      const data = await apiClient.request('/api/items/upload-only', {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
+        body: formData,
+        isFormData: true
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Upload failed');
       return { file_url: data.url };
     }
   }
