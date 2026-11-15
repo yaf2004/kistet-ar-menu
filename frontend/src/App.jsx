@@ -13,6 +13,7 @@ import AdminCategories from '@/pages/AdminCategories';
 import AdminQR from '@/pages/AdminQR';
 import AdminSettings from '@/pages/AdminSettings';
 import AdminRestaurants from '@/pages/AdminRestaurants';
+import AdminOrders from '@/pages/AdminOrders';
 import CustomerMenu from '@/pages/CustomerMenu';
 import Login from '@/pages/Login';
 import Home from '@/pages/Home';
