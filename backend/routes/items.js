@@ -1,31 +1,73 @@
 const router = require('express').Router();
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
 const MenuItem = require('../models/MenuItem');
-const { protect } = require('../middleware/auth');
+const MenuCategory = require('../models/MenuCategory');
+const Restaurant = require('../models/Restaurant');
+const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
 
-// Use memory storage — files go to Cloudinary, not local disk
-// (local disk doesn't persist on Render's free tier)
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_MODEL_BYTES = 25 * 1024 * 1024;
+const editableFields = [
+  'category_id', 'name', 'description', 'price', 'is_available',
+  'is_featured', 'ar_enabled', 'tags', 'allergens', 'ingredients', 'sort_order'
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: MAX_MODEL_BYTES, files: 2, fields: 30, parts: 34 },
   fileFilter: (req, file, cb) => {
     const ext = file.originalname.split('.').pop().toLowerCase();
-    if (/jpeg|jpg|png|webp|glb|gltf/.test(ext)) cb(null, true);
-    else cb(new Error('Invalid file type. Use jpg/png/webp for photos, glb/gltf for 3D models.'));
+    const imageOk = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) &&
+      ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
+    const modelOk = ext === 'glb' && file.mimetype === 'model/gltf-binary';
+    if (imageOk || modelOk) return cb(null, true);
+    cb(new Error('Unsupported upload. Use JPEG, PNG, WebP, or binary GLB files only.'));
   }
 });
 
-function canAccessRestaurant(user, restaurantId) {
-  return user.role === 'super_admin' || String(user.restaurant) === String(restaurantId);
+function parseList(value) {
+  if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(',').map((v) => v.trim()).filter(Boolean);
+  return value;
 }
 
-// Upload a file from the request to Cloudinary, returns the secure URL
-async function handleFileUpload(file) {
-  if (!file) return null;
+function pickEditableFields(source) {
+  const data = {};
+  for (const key of editableFields) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) data[key] = source[key];
+  }
+  if (typeof data.tags === 'string') data.tags = parseList(data.tags);
+  if (typeof data.allergens === 'string') data.allergens = parseList(data.allergens);
+  return data;
+}
+
+function validateFileSignature(file) {
+  if (!file) return true;
+  const b = file.buffer;
   const ext = file.originalname.split('.').pop().toLowerCase();
-  const isModel = /glb|gltf/.test(ext);
+  if (ext === 'jpg' || ext === 'jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (ext === 'png') return b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (ext === 'webp') return b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
+  if (ext === 'glb') return b.toString('ascii', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2;
+  return false;
+}
+
+async function handleFileUpload(file, kind) {
+  if (!file) return null;
+  if (!validateFileSignature(file)) {
+    const error = new Error('The uploaded file content does not match its file type');
+    error.status = 400;
+    throw error;
+  }
+  const isModel = kind === 'model';
+  if (!isModel && file.size > MAX_IMAGE_BYTES) {
+    const error = new Error('Images must be 8 MB or smaller');
+    error.status = 413;
+    throw error;
+  }
   const result = await uploadToCloudinary(file.buffer, {
     folder: isModel ? 'ar-menu/models' : 'ar-menu/dishes',
     resourceType: isModel ? 'raw' : 'image',
@@ -34,104 +76,153 @@ async function handleFileUpload(file) {
   return result.secure_url;
 }
 
-// ── ADMIN: standalone file upload (for restaurant logo/cover or 3D models) ──
+async function validateCategory(categoryId, restaurantId) {
+  if (!mongoose.isValidObjectId(categoryId)) return false;
+  return Boolean(await MenuCategory.exists({ _id: categoryId, restaurant: restaurantId }));
+}
+
 router.post('/upload-only', protect,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
-      if (req.files?.image) {
-        const url = await handleFileUpload(req.files.image[0]);
-        return res.json({ url });
+      const restaurantId = req.body.restaurant || req.query.restaurant;
+      if (!mongoose.isValidObjectId(restaurantId)) {
+        return res.status(400).json({ error: 'A valid restaurant ID is required for uploads' });
       }
-      if (req.files?.model3d) {
-        const url = await handleFileUpload(req.files.model3d[0]);
-        return res.json({ url });
+      if (!canAccessRestaurant(req.user, restaurantId)) {
+        return res.status(403).json({ error: 'Not your restaurant' });
       }
-      return res.status(400).json({ error: 'No file uploaded' });
-    } catch (err) {
-      console.error('Upload error:', err);
-      res.status(500).json({ error: err.message });
-    }
+      if (!await Restaurant.exists({ _id: restaurantId })) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      const imageFile = req.files?.image?.[0];
+      const modelFile = req.files?.model3d?.[0];
+      if (!imageFile && !modelFile) return res.status(400).json({ error: 'No file uploaded' });
+      if (imageFile && modelFile) return res.status(400).json({ error: 'Upload one asset at a time' });
+      const url = imageFile
+        ? await handleFileUpload(imageFile, 'image')
+        : await handleFileUpload(modelFile, 'model');
+      res.status(201).json({ url });
+    } catch (err) { next(err); }
   }
 );
 
-// ── PUBLIC: items for the customer-facing menu ──
-router.get('/public/:restaurantId', async (req, res) => {
+router.get('/public/:restaurantId', async (req, res, next) => {
   try {
-    const items = await MenuItem.find({ restaurant: req.params.restaurantId, is_available: true }).sort('sort_order');
+    if (!mongoose.isValidObjectId(req.params.restaurantId)) {
+      return res.status(400).json({ error: 'Invalid restaurant ID' });
+    }
+    const items = await MenuItem.find({
+      restaurant: req.params.restaurantId,
+      is_available: true
+    }).select('category_id name description price image_url is_featured ar_enabled model_3d_url tags allergens ingredients sort_order')
+      .sort({ sort_order: 1, name: 1 }).lean();
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
     res.json(items);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { next(err); }
 });
 
-// ── ADMIN: list items for a restaurant ──
-router.get('/:restaurantId', protect, async (req, res) => {
+router.get('/:restaurantId', protect, async (req, res, next) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.restaurantId)) {
+      return res.status(400).json({ error: 'Invalid restaurant ID' });
+    }
     if (!canAccessRestaurant(req.user, req.params.restaurantId)) {
       return res.status(403).json({ error: 'Not your restaurant' });
     }
-    const items = await MenuItem.find({ restaurant: req.params.restaurantId }).sort('-createdAt');
+    const items = await MenuItem.find({ restaurant: req.params.restaurantId })
+      .sort({ sort_order: 1, createdAt: -1 }).lean();
     res.json(items);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { next(err); }
 });
 
-// ── ADMIN: create item ──
 router.post('/', protect,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
-      const data = { ...req.body };
-      if (!canAccessRestaurant(req.user, data.restaurant)) {
+      const restaurantId = req.body.restaurant;
+      if (!mongoose.isValidObjectId(restaurantId)) {
+        return res.status(400).json({ error: 'A valid restaurant is required' });
+      }
+      if (!canAccessRestaurant(req.user, restaurantId)) {
         return res.status(403).json({ error: 'Not your restaurant' });
       }
-      if (req.files?.image)   data.image_url    = await handleFileUpload(req.files.image[0]);
-      if (req.files?.model3d) data.model_3d_url = await handleFileUpload(req.files.model3d[0]);
-      if (typeof data.tags === 'string') data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
-      if (typeof data.allergens === 'string') data.allergens = data.allergens.split(',').map(a => a.trim()).filter(Boolean);
-      const item = await MenuItem.create(data);
+      if (!await Restaurant.exists({ _id: restaurantId })) {
+        return res.status(404).json({ error: 'Restaurant not found' });
+      }
+      const data = pickEditableFields(req.body);
+      if (typeof data.name !== 'string' || !data.name.trim()) {
+        return res.status(400).json({ error: 'Item name is required' });
+      }
+      if (!Number.isFinite(Number(data.price)) || Number(data.price) < 0) {
+        return res.status(400).json({ error: 'A valid non-negative price is required' });
+      }
+      data.price = Number(data.price);
+      if (!await validateCategory(data.category_id, restaurantId)) {
+        return res.status(400).json({ error: 'The selected category does not belong to this restaurant' });
+      }
+      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image');
+      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model');
+      data.ar_enabled = Boolean(data.model_3d_url) && data.ar_enabled !== false && data.ar_enabled !== 'false';
+      const item = await MenuItem.create({ ...data, restaurant: restaurantId, name: data.name.trim() });
       res.status(201).json(item);
-    } catch (err) {
-      console.error('Create item error:', err);
-      res.status(500).json({ error: err.message });
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// ── ADMIN: update item ──
 router.put('/:id', protect,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
-  async (req, res) => {
+  async (req, res, next) => {
     try {
+      if (!mongoose.isValidObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'Invalid item ID' });
+      }
       const existing = await MenuItem.findById(req.params.id);
-      if (!existing) return res.status(404).json({ error: 'Not found' });
+      if (!existing) return res.status(404).json({ error: 'Menu item not found' });
       if (!canAccessRestaurant(req.user, existing.restaurant)) {
         return res.status(403).json({ error: 'Not your item' });
       }
-      const data = { ...req.body };
-      if (req.files?.image)   data.image_url    = await handleFileUpload(req.files.image[0]);
-      if (req.files?.model3d) data.model_3d_url = await handleFileUpload(req.files.model3d[0]);
-      if (typeof data.tags === 'string') data.tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
-      if (typeof data.allergens === 'string') data.allergens = data.allergens.split(',').map(a => a.trim()).filter(Boolean);
+
+      const data = pickEditableFields(req.body);
+      if (Object.prototype.hasOwnProperty.call(data, 'name')) {
+        if (typeof data.name !== 'string' || !data.name.trim()) {
+          return res.status(400).json({ error: 'Item name cannot be empty' });
+        }
+        data.name = data.name.trim();
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'price')) {
+        if (!Number.isFinite(Number(data.price)) || Number(data.price) < 0) {
+          return res.status(400).json({ error: 'A valid non-negative price is required' });
+        }
+        data.price = Number(data.price);
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'category_id') &&
+          !await validateCategory(data.category_id, existing.restaurant)) {
+        return res.status(400).json({ error: 'The selected category does not belong to this restaurant' });
+      }
+      if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image');
+      if (req.files?.model3d?.[0]) data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model');
       Object.assign(existing, data);
+      if (!existing.model_3d_url) existing.ar_enabled = false;
       await existing.save();
       res.json(existing);
-    } catch (err) {
-      console.error('Update item error:', err);
-      res.status(500).json({ error: err.message });
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// ── ADMIN: delete item ──
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, async (req, res, next) => {
   try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid item ID' });
+    }
     const item = await MenuItem.findById(req.params.id);
-    if (!item) return res.status(404).json({ error: 'Not found' });
+    if (!item) return res.status(404).json({ error: 'Menu item not found' });
     if (!canAccessRestaurant(req.user, item.restaurant)) {
       return res.status(403).json({ error: 'Not your item' });
     }
     await item.deleteOne();
-    res.json({ message: 'Deleted' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    res.status(204).end();
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
