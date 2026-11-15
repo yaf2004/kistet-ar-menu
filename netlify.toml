@@ -1,5 +1,6 @@
 [build]
   base = "frontend"
+  environment = { NODE_VERSION = "20" }
   command = "npm ci --legacy-peer-deps && npm run build"
   publish = "dist"
 
