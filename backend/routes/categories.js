@@ -4,6 +4,7 @@ const MenuCategory = require('../models/MenuCategory');
 const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
+const { enforceLimit } = require('../lib/tenantEntitlements');
 
 const editableFields = ['name', 'description', 'sort_order', 'is_active'];
 
@@ -60,6 +61,8 @@ router.post('/', protect, async (req, res, next) => {
     if (typeof data.name !== 'string' || !data.name.trim()) {
       return res.status(400).json({ error: 'Category name is required' });
     }
+    const categoryCount = await MenuCategory.countDocuments({ restaurant });
+    await enforceLimit(restaurant, 'categories', categoryCount);
     const cat = await MenuCategory.create({ ...data, name: data.name.trim(), restaurant });
     res.status(201).json(cat);
   } catch (err) { next(err); }
