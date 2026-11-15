@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { UtensilsCrossed, Tags, Eye, Star, TrendingUp, ArrowRight } from "lucide-react";
+import { UtensilsCrossed, Tags, Eye, Star, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
