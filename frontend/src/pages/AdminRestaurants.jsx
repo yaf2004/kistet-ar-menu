@@ -156,7 +156,7 @@ export default function AdminRestaurants() {
                 </div>
                 <div className="space-y-2">
                   <Label>Owner Password *</Label>
-                  <Input type="password" value={form.ownerPassword} onChange={e => setForm(f => ({ ...f, ownerPassword: e.target.value }))} required minLength={8} placeholder="Min 8 characters" />
+                  <Input type="password" value={form.ownerPassword} onChange={e => setForm(f => ({ ...f, ownerPassword: e.target.value }))} required minLength={12} placeholder="Min 12 characters" />
                 </div>
               </div>
             </div>
