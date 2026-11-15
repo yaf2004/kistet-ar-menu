@@ -8,7 +8,9 @@ const models = [
   require('./models/MenuCategory'),
   require('./models/LoginAttempt'),
   require('./models/Order'),
-  require('./models/RateLimitBucket')
+  require('./models/RateLimitBucket'),
+  require('./models/Plan'),
+  require('./models/Subscription')
 ];
 
 async function start() {
@@ -36,7 +38,8 @@ async function start() {
     autoIndex: isProduction ? false : true
   });
   await Promise.all(models.map((model) => model.createIndexes()));
-  console.log('MongoDB connected and indexes verified');
+  await require('./lib/saasBootstrap').ensurePlatformCatalog();
+  console.log('MongoDB connected, indexes verified, and SaaS catalog initialized');
 
   const port = Number(process.env.PORT || 4000);
   const server = app.listen(port, () => {
