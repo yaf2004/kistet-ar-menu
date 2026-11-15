@@ -9,6 +9,7 @@ const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
 const uploadRateLimiter = require('../middleware/uploadRateLimiter');
 const { validateGlb } = require('../lib/glbValidation');
+const { requireUsableSubscription, enforceLimit } = require('../lib/tenantEntitlements');
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
@@ -122,6 +123,11 @@ router.post('/upload-only', protect, uploadRateLimiter,
       }
       const imageFile = req.files?.image?.[0];
       const modelFile = req.files?.model3d?.[0];
+      const subscription = await requireUsableSubscription(restaurantId);
+      const asset = modelFile || imageFile;
+      if (asset && asset.size > subscription.plan.limits.assetBytes) {
+        return res.status(413).json({ error: 'This asset exceeds the maximum upload size for the current plan.' });
+      }
       if (!imageFile && !modelFile) return res.status(400).json({ error: 'No file uploaded' });
       if (imageFile && modelFile) return res.status(400).json({ error: 'Upload one asset at a time' });
       const url = imageFile
@@ -181,6 +187,8 @@ router.post('/', protect, uploadRateLimiter,
         return res.status(404).json({ error: 'Restaurant not found' });
       }
       const data = pickEditableFields(req.body);
+      const itemCount = await MenuItem.countDocuments({ restaurant: restaurantId });
+      await enforceLimit(restaurantId, 'menuItems', itemCount);
       if (typeof data.name !== 'string' || !data.name.trim()) {
         return res.status(400).json({ error: 'Item name is required' });
       }
@@ -203,6 +211,10 @@ router.post('/', protect, uploadRateLimiter,
         data.model_3d_metadata = req.files.model3d[0].glbMetadata;
       }
       data.ar_enabled = Boolean(data.model_3d_url) && data.ar_enabled !== false && data.ar_enabled !== 'false';
+      if (data.ar_enabled) {
+        const arCount = await MenuItem.countDocuments({ restaurant: restaurantId, ar_enabled: true });
+        await enforceLimit(restaurantId, 'arItems', arCount);
+      }
       const item = await MenuItem.create({ ...data, restaurant: restaurantId, name: data.name.trim() });
       res.status(201).json(item);
     } catch (err) { next(err); }
@@ -222,6 +234,7 @@ router.put('/:id', protect, uploadRateLimiter,
         return res.status(403).json({ error: 'Not your item' });
       }
 
+      const wasArEnabled = existing.ar_enabled;
       const data = pickEditableFields(req.body);
       if (req.body.image_url === '') data.image_url = undefined;
       if (req.body.model_3d_url === '') data.model_3d_url = undefined;
@@ -249,10 +262,18 @@ router.put('/:id', protect, uploadRateLimiter,
       }
       if (req.files?.image?.[0]) data.image_url = await handleFileUpload(req.files.image[0], 'image', existing.restaurant);
       if (req.files?.model3d?.[0]) {
+        const subscription = await requireUsableSubscription(existing.restaurant);
+        if (req.files.model3d[0].size > subscription.plan.limits.assetBytes) {
+          return res.status(413).json({ error: 'This model exceeds the maximum upload size for the current plan.' });
+        }
         data.model_3d_url = await handleFileUpload(req.files.model3d[0], 'model', existing.restaurant);
         data.model_3d_metadata = req.files.model3d[0].glbMetadata;
       }
       Object.assign(existing, data);
+      if (existing.ar_enabled && !wasArEnabled) {
+        const arCount = await MenuItem.countDocuments({ restaurant: existing.restaurant, ar_enabled: true, _id: { $ne: existing._id } });
+        await enforceLimit(existing.restaurant, 'arItems', arCount);
+      }
       if (!existing.model_3d_url) existing.ar_enabled = false;
       await existing.save();
       res.json(existing);
