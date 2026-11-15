@@ -6,15 +6,7 @@ const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const orderCreationLimiter = require('../middleware/orderCreationLimiter');
-
-const transitions = {
-  new: ['accepted', 'cancelled'],
-  accepted: ['preparing', 'cancelled'],
-  preparing: ['ready', 'cancelled'],
-  ready: ['completed'],
-  completed: [],
-  cancelled: []
-};
+const { canTransitionOrder } = require('../lib/orderState');
 
 function hash(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -226,13 +218,16 @@ router.patch('/:id/status', protect, async (req, res, next) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (!canAccessRestaurant(req.user, order.restaurant)) return res.status(403).json({ error: 'Not your order' });
     const nextStatus = req.body.status;
-    if (!Object.prototype.hasOwnProperty.call(transitions, order.status) ||
-        !transitions[order.status].includes(nextStatus)) {
+    if (!canTransitionOrder(order.status, nextStatus)) {
       return res.status(409).json({ error: `Cannot move an order from ${order.status} to ${String(nextStatus)}` });
     }
     order.status = nextStatus;
     order.statusHistory.push({ status: nextStatus, actor: req.user._id, at: new Date() });
-    await order.save();
+    try { await order.save(); }
+    catch (err) {
+      if (err.name === 'VersionError') return res.status(409).json({ error: 'This order changed in another session. Refresh and try again.' });
+      throw err;
+    }
     return res.json(staffOrder(order.toObject()));
   } catch (err) { return next(err); }
 });
