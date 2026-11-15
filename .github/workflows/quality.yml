@@ -42,6 +42,8 @@ jobs:
             git -C "$GITHUB_WORKSPACE" config user.name "github-actions[bot]"
             git -C "$GITHUB_WORKSPACE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git -C "$GITHUB_WORKSPACE" commit -m "security(deps): refresh backend lockfile"
+            git -C "$GITHUB_WORKSPACE" fetch origin "$BRANCH_NAME"
+            git -C "$GITHUB_WORKSPACE" rebase "origin/$BRANCH_NAME"
             git -C "$GITHUB_WORKSPACE" push origin "HEAD:$BRANCH_NAME"
           fi
 
@@ -78,5 +80,7 @@ jobs:
             git -C "$GITHUB_WORKSPACE" config user.name "github-actions[bot]"
             git -C "$GITHUB_WORKSPACE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git -C "$GITHUB_WORKSPACE" commit -m "security(deps): refresh frontend lockfile"
+            git -C "$GITHUB_WORKSPACE" fetch origin "$BRANCH_NAME"
+            git -C "$GITHUB_WORKSPACE" rebase "origin/$BRANCH_NAME"
             git -C "$GITHUB_WORKSPACE" push origin "HEAD:$BRANCH_NAME"
           fi
