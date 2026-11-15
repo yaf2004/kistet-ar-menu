@@ -9,14 +9,13 @@ function hashKey(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function getAttemptWindow(req) {
-  const now = Date.now();
+function getAttemptWindow(req, now = Date.now()) {
   const bucket = Math.floor(now / WINDOW_MS);
   const expiresAt = new Date((bucket + 2) * WINDOW_MS);
   const ip = String(req.ip || req.socket.remoteAddress || 'unknown');
   const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   const keys = [`ip:${hashKey(ip)}:${bucket}`];
-  if (email) keys.push(`identity:${hashKey(ip + ':' + email)}:${bucket}`);
+  if (email) keys.push(`identity:${hashKey(email)}:${bucket}`);
   return { keys, expiresAt, now };
 }
 
@@ -34,6 +33,8 @@ async function increment(key, expiresAt) {
     return LoginAttempt.findOneAndUpdate({ key }, { $inc: { count: 1 } }, { new: true });
   }
 }
+
+exports.getAttemptWindow = getAttemptWindow;
 
 exports.loginAttemptLimiter = async (req, res, next) => {
   try {
@@ -54,5 +55,7 @@ exports.loginAttemptLimiter = async (req, res, next) => {
 
 exports.clearLoginAttempts = async (req) => {
   const window = req.loginAttemptWindow || getAttemptWindow(req);
-  await LoginAttempt.deleteMany({ key: { $in: window.keys } });
+  // Clear only this caller's IP bucket. Keep the account-wide bucket until
+  // expiry so a successful login from another IP cannot reset distributed guesses.
+  await LoginAttempt.deleteMany({ key: window.keys.slice(0, 1)[0] });
 };
