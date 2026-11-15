@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, X, Building2, LogOut, ClipboardList } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, Building2, LogOut, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 
