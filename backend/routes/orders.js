@@ -6,7 +6,7 @@ const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const orderCreationLimiter = require('../middleware/orderCreationLimiter');
-const { canTransitionOrder } = require('../lib/orderState');
+const { ORDER_TRANSITIONS, canTransitionOrder } = require('../lib/orderState');
 
 function hash(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -202,7 +202,12 @@ router.get('/restaurant/:restaurantId', protect, async (req, res, next) => {
     const page = Math.max(1, Math.min(10000, Number.parseInt(req.query.page, 10) || 1));
     const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 30));
     const filter = { restaurant: restaurantId };
-    if (req.query.status && transitions[req.query.status]) filter.status = req.query.status;
+    if (req.query.status) {
+      if (!Object.prototype.hasOwnProperty.call(ORDER_TRANSITIONS, req.query.status)) {
+        return res.status(400).json({ error: 'Invalid order status filter' });
+      }
+      filter.status = req.query.status;
+    }
     const [orders, total] = await Promise.all([
       Order.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Order.countDocuments(filter)
