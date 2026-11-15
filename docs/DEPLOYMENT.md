@@ -41,6 +41,7 @@ After MongoDB is connected and the backend is deployed, run `npm run seed` from 
 4. Confirm an untrusted origin cannot log in or make authenticated state-changing requests.
 5. Create a test restaurant, category, item, GLB upload, QR code, and test order.
 6. Verify that one restaurant cannot read or mutate another restaurant's items or orders.
+9. Keep image and GLB uploads at or below 4 MB while using the Netlify buffered function proxy; optimize 3D assets before upload.
 7. Verify the order status path: new → accepted → preparing → ready → completed.
 8. Test on a real Android AR-capable device and an iPhone; desktop model viewing is not proof that device AR works.
 
