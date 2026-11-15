@@ -75,8 +75,9 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   const status = Number.isInteger(err.status) ? err.status :
-    (err.name === 'ValidationError' || err.name === 'CastError' ? 400 :
-      (err.code === 11000 ? 409 : 500));
+    (err.code === 'LIMIT_FILE_SIZE' ? 413 :
+      (err.name === 'ValidationError' || err.name === 'CastError' || err.name === 'SyntaxError' ? 400 :
+        (err.code === 11000 ? 409 : (err.message === 'Origin is not allowed by CORS' ? 403 : 500))));
   if (status >= 500) {
     console.error('Request failed', { requestId: req.requestId, message: err.message, stack: err.stack });
   }
