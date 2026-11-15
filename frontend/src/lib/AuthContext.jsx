@@ -30,8 +30,8 @@ export const AuthProvider = ({ children }) => {
     checkUserAuth();
   }, [checkUserAuth]);
 
-  const logout = (shouldRedirect = true) => {
-    base44.auth.logout();
+  const logout = async (shouldRedirect = true) => {
+    await base44.auth.logout();
     clearUserCache();
     setUser(null);
     setIsAuthenticated(false);
