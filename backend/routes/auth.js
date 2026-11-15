@@ -1,7 +1,54 @@
 const router = require('express').Router();
 const User = require('../models/User');
 const { loginAttemptLimiter } = require('../middleware/loginAttemptLimiter');
-const { signToken, protect } = require('../middleware/auth');
+const {
+  signToken,
+  protect,
+  sessionCookieName,
+  csrfCookieName,
+  createCsrfToken
+} = require('../middleware/auth');
+
+function cookieOptions(maxAge) {
+  const secure = process.env.NODE_ENV === 'production';
+  const sameSite = secure ? 'None' : 'Lax';
+  return `Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=${sameSite}${secure ? '; Secure' : ''}`;
+}
+
+function setSessionCookies(res, token, csrfToken) {
+  const sessionAge = 12 * 60 * 60;
+  const secure = process.env.NODE_ENV === 'production';
+  const sameSite = secure ? 'None' : 'Lax';
+  res.append('Set-Cookie', `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; Max-Age=${sessionAge}; HttpOnly; SameSite=${sameSite}${secure ? '; Secure' : ''}`);
+  res.append('Set-Cookie', `${csrfCookieName}=${encodeURIComponent(csrfToken)}; Path=/; Max-Age=${sessionAge}; SameSite=${sameSite}${secure ? '; Secure' : ''}`);
+}
+
+function clearSessionCookies(res) {
+  const secure = process.env.NODE_ENV === 'production';
+  const sameSite = secure ? 'None' : 'Lax';
+  res.append('Set-Cookie', `${sessionCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=${sameSite}${secure ? '; Secure' : ''}`);
+  res.append('Set-Cookie', `${csrfCookieName}=; Path=/; Max-Age=0; SameSite=${sameSite}${secure ? '; Secure' : ''}`);
+}
+
+function readCookie(req, name) {
+  const prefix = `${name}=`;
+  const entry = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(prefix));
+  if (!entry) return '';
+  try { return decodeURIComponent(entry.slice(prefix.length)); }
+  catch { return ''; }
+}
+
+router.get('/csrf', (req, res) => {
+  const existing = readCookie(req, csrfCookieName);
+  const csrfToken = existing || createCsrfToken();
+  if (!existing) {
+    const secure = process.env.NODE_ENV === 'production';
+    const sameSite = secure ? 'None' : 'Lax';
+    res.append('Set-Cookie', `${csrfCookieName}=${encodeURIComponent(csrfToken)}; Path=/; Max-Age=43200; SameSite=${sameSite}${secure ? '; Secure' : ''}`);
+  }
+  res.set('Cache-Control', 'no-store');
+  return res.json({ csrfToken });
+});
 
 router.post('/login', loginAttemptLimiter, async (req, res, next) => {
   try {
@@ -21,10 +68,11 @@ router.post('/login', loginAttemptLimiter, async (req, res, next) => {
       return res.status(403).json({ error: 'This restaurant account is currently unavailable' });
     }
 
-    const token = signToken(user._id);
+    const csrfToken = createCsrfToken();
+    setSessionCookies(res, signToken(user._id), csrfToken);
     res.set('Cache-Control', 'no-store');
-    res.json({
-      token,
+    return res.json({
+      csrfToken,
       user: {
         id: user._id,
         name: user.name,
@@ -33,7 +81,13 @@ router.post('/login', loginAttemptLimiter, async (req, res, next) => {
         restaurant: user.restaurant
       }
     });
-  } catch (err) { next(err); }
+  } catch (err) { return next(err); }
+});
+
+router.post('/logout', (req, res) => {
+  clearSessionCookies(res);
+  res.set('Cache-Control', 'no-store');
+  return res.status(204).end();
 });
 
 router.get('/me', protect, async (req, res, next) => {
@@ -44,8 +98,8 @@ router.get('/me', protect, async (req, res, next) => {
       .lean();
     if (!user) return res.status(401).json({ error: 'Account is no longer available' });
     res.set('Cache-Control', 'no-store');
-    res.json(user);
-  } catch (err) { next(err); }
+    return res.json(user);
+  } catch (err) { return next(err); }
 });
 
 module.exports = router;
