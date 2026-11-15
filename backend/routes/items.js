@@ -8,8 +8,8 @@ const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_MODEL_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_MODEL_BYTES = 4 * 1024 * 1024;
 const editableFields = [
   'category_id', 'name', 'description', 'price', 'is_available',
   'is_featured', 'ar_enabled', 'image_url', 'model_3d_url', 'tags', 'allergens', 'ingredients', 'sort_order'
