@@ -15,7 +15,7 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
 const editableFields = [
   'category_id', 'name', 'description', 'price', 'is_available',
-  'is_featured', 'ar_enabled', 'image_url', 'model_3d_url', 'tags', 'allergens', 'ingredients', 'sort_order'
+  'is_featured', 'ar_enabled', 'image_url', 'model_3d_url', 'model_3d_metadata', 'tags', 'allergens', 'ingredients', 'sort_order'
 ];
 
 const upload = multer({
@@ -43,6 +43,17 @@ function pickEditableFields(source) {
   const data = {};
   for (const key of editableFields) {
     if (Object.prototype.hasOwnProperty.call(source, key)) data[key] = source[key];
+  }
+  if (data.model_3d_metadata && typeof data.model_3d_metadata === 'object') {
+    const metadata = data.model_3d_metadata;
+    const integerFields = ['fileSizeBytes', 'vertexCount', 'triangleCount', 'meshCount', 'materialCount', 'textureCount', 'imageCount', 'nodeCount'];
+    const valid = metadata.format === 'glb' && metadata.gltfVersion === '2.0' &&
+      integerFields.every((field) => Number.isSafeInteger(Number(metadata[field])) && Number(metadata[field]) >= 0);
+    data.model_3d_metadata = valid ? {
+      format: 'glb', gltfVersion: '2.0',
+      ...Object.fromEntries(integerFields.map((field) => [field, Number(metadata[field])])),
+      validatedAt: new Date()
+    } : undefined;
   }
   if (typeof data.tags === 'string') data.tags = parseList(data.tags);
   if (typeof data.allergens === 'string') data.allergens = parseList(data.allergens);
