@@ -7,6 +7,7 @@ const MenuCategory = require('../models/MenuCategory');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const { uploadToCloudinary } = require('../config/cloudinary');
+const uploadRateLimiter = require('../middleware/uploadRateLimiter');
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_MODEL_BYTES = 15 * 1024 * 1024;
@@ -109,7 +110,7 @@ async function validateCategory(categoryId, restaurantId) {
   return Boolean(await MenuCategory.exists({ _id: categoryId, restaurant: restaurantId }));
 }
 
-router.post('/upload-only', protect,
+router.post('/upload-only', protect, uploadRateLimiter,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
   async (req, res, next) => {
     try {
@@ -169,7 +170,7 @@ router.get('/:restaurantId', protect, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', protect,
+router.post('/', protect, uploadRateLimiter,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
   async (req, res, next) => {
     try {
@@ -209,7 +210,7 @@ router.post('/', protect,
   }
 );
 
-router.put('/:id', protect,
+router.put('/:id', protect, uploadRateLimiter,
   upload.fields([{ name: 'image', maxCount: 1 }, { name: 'model3d', maxCount: 1 }]),
   async (req, res, next) => {
     try {
