@@ -25,7 +25,6 @@ test('validates a self-contained glTF 2.0 binary model and returns metadata', ()
     accessors: [{ type: 'VEC3', count: 300 }],
     materials: [{}],
     textures: [{}],
-    images: [{}],
     nodes: [{ mesh: 0 }]
   });
   const metadata = validateGlb(buffer);
@@ -51,13 +50,13 @@ test('rejects external model buffers and images', () => {
   assert.throws(() => validateGlb(makeGlb({
     asset: { version: '2.0' },
     images: [{ uri: 'https://example.com/texture.png' }]
-  })), /External image files/);
+  })), /External or unreferenced image files/);
 });
 
 test('rejects models that exceed the triangle budget', () => {
   assert.throws(() => validateGlb(makeGlb({
     asset: { version: '2.0' },
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
-    accessors: [{ type: 'VEC3', count: 600003 }]
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
+    accessors: [{ type: 'VEC3', count: 3 }, { type: 'SCALAR', count: 600003 }]
   })), /too many polygons/);
 });
