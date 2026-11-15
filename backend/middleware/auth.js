@@ -70,6 +70,7 @@ exports.protect = async (req, res, next) => {
 
     const user = await User.findById(decoded.sub).select('-password');
     if (!user) return res.status(401).json({ error: 'Account is no longer available' });
+    if (decoded.ver !== (user.tokenVersion || 0)) return res.status(401).json({ error: 'Session has been revoked. Please log in again.' });
     if (user.role === 'restaurant_admin') {
       if (!user.restaurant) return res.status(403).json({ error: 'Restaurant account is not correctly configured' });
       const activeRestaurant = await Restaurant.exists({ _id: user.restaurant, active: true });
@@ -108,8 +109,8 @@ exports.scopeToOwnRestaurant = (req, res, next) => {
   return next();
 };
 
-exports.signToken = (id) => jwt.sign(
-  { sub: String(id) },
+exports.signToken = (id, tokenVersion = 0) => jwt.sign(
+  { sub: String(id), ver: tokenVersion },
   getJwtSecret(),
   {
     algorithm: 'HS256',
