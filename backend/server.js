@@ -1,6 +1,13 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const app = require('./app');
+const models = [
+  require('./models/User'),
+  require('./models/Restaurant'),
+  require('./models/MenuItem'),
+  require('./models/MenuCategory'),
+  require('./models/LoginAttempt')
+];
 
 async function start() {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -22,7 +29,8 @@ async function start() {
     serverSelectionTimeoutMS: 10000,
     autoIndex: isProduction ? false : true
   });
-  console.log('MongoDB connected');
+  await Promise.all(models.map((model) => model.createIndexes()));
+  console.log('MongoDB connected and indexes verified');
 
   const port = Number(process.env.PORT || 4000);
   const server = app.listen(port, () => {
