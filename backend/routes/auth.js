@@ -9,12 +9,6 @@ const {
   createCsrfToken
 } = require('../middleware/auth');
 
-function cookieOptions(maxAge) {
-  const secure = process.env.NODE_ENV === 'production';
-  const sameSite = secure ? 'None' : 'Lax';
-  return `Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=${sameSite}${secure ? '; Secure' : ''}`;
-}
-
 function setSessionCookies(res, token, csrfToken) {
   const sessionAge = 12 * 60 * 60;
   const secure = process.env.NODE_ENV === 'production';
@@ -50,7 +44,22 @@ router.get('/csrf', (req, res) => {
   return res.json({ csrfToken });
 });
 
-router.post('/login', loginAttemptLimiter, async (req, res, next) => {
+function requireTrustedOrigin(req, res, next) {
+  const origin = String(req.headers.origin || '').replace(/\/$/, '');
+  const configured = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const allowed = configured.length ? configured : (
+    process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173', 'http://127.0.0.1:5173']
+  );
+  if ((origin && !allowed.includes(origin)) || (!origin && process.env.NODE_ENV === 'production')) {
+    return res.status(403).json({ error: 'Untrusted request origin' });
+  }
+  return next();
+}
+
+router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res, next) => {
   try {
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const password = typeof req.body.password === 'string' ? req.body.password : '';
