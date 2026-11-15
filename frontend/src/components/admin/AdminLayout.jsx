@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, Building2, LogOut, ClipboardList } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Tags, Settings, QrCode, Menu, Building2, LogOut, ClipboardList, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -14,6 +14,8 @@ const navItems = [
 ];
 
 const superAdminItem = { label: "All Restaurants", path: "/admin/restaurants", icon: Building2 };
+const subscriptionItem = { label: "Subscriptions", path: "/admin/subscription", icon: CreditCard };
+const myPlanItem = { label: "My Plan", path: "/admin/subscription", icon: CreditCard };
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -21,7 +23,7 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
 
-  const items = isSuperAdmin ? [superAdminItem, ...navItems] : navItems;
+  const items = isSuperAdmin ? [superAdminItem, ...navItems, subscriptionItem] : [...navItems, myPlanItem];
 
   return (
     <div className="min-h-screen bg-stone-50 flex">
