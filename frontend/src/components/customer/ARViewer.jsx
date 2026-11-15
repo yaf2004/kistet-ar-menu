@@ -3,6 +3,8 @@ import { X, RotateCcw, ZoomIn, ZoomOut, Rotate3D, Smartphone, AlertCircle } from
 import "@google/model-viewer";
 
 const MESHOPT_DECODER_URL = "https://unpkg.com/meshoptimizer@0.18.1/meshopt_decoder.js";
+// A visible equirectangular HDRI skybox is required; environment-image alone only lights/reflections the model.
+const AR_SKYBOX_URL = "https://modelviewer.dev/shared-assets/environments/lebombo_1k.hdr";
 
 export default function ARViewer({ item, onClose }) {
   const viewerRef = useRef(null);
@@ -96,11 +98,12 @@ export default function ARViewer({ item, onClose }) {
             shadow-intensity="1"
             shadow-softness="0.8"
             exposure="1"
-            environment-image="neutral"
+            skybox-image={AR_SKYBOX_URL}
+            skybox-height="1.5m"
             loading="eager"
             reveal="auto"
             touch-action="pan-y"
-            style={{ width: "100%", height: "100%", backgroundColor: "#090909", "--poster-color": "#090909" }}
+            style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 50% 35%, #75685a 0%, #393129 58%, #171411 100%)", "--poster-color": "#393129" }}
           >
             <button slot="ar-button" className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-stone-900 shadow-xl flex items-center gap-2">
               <Smartphone size={16} /> View on your table
