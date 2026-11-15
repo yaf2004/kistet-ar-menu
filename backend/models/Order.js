@@ -8,6 +8,13 @@ const orderLineSchema = new mongoose.Schema({
   lineTotal: { type: Number, required: true, min: 0 }
 }, { _id: false });
 
+const orderStatusEventSchema = new mongoose.Schema({
+  status: { type: String, enum: ['new', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'], required: true },
+  actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  at: { type: Date, default: Date.now },
+  note: { type: String, trim: true, maxlength: 300, default: null }
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
   restaurant: { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true },
   orderNumber: { type: String, required: true },
@@ -21,6 +28,7 @@ const orderSchema = new mongoose.Schema({
   customerName: { type: String, trim: true, maxlength: 120, default: null },
   customerPhone: { type: String, trim: true, maxlength: 40, default: null },
   notes: { type: String, trim: true, maxlength: 500, default: null },
+  statusHistory: { type: [orderStatusEventSchema], default: [] },
   status: {
     type: String,
     enum: ['new', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'],
