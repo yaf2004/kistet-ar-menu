@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "@/api/client";
 import { ShoppingBag, Plus, Minus, X, CheckCircle2, RefreshCw } from "lucide-react";
 
@@ -7,7 +7,7 @@ function makeIdempotencyKey() {
   return `order_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-export default function CustomerOrdering({ restaurantSlug, tableNumber, items, currency = "$", theme }) {
+export default function CustomerOrdering({ restaurantSlug, tableNumber, items, currency = "$" }) {
   const [cart, setCart] = useState({});
   const [open, setOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -30,6 +30,15 @@ export default function CustomerOrdering({ restaurantSlug, tableNumber, items, c
     setCart((current) => ({ ...current, [item.id]: Math.min(50, (current[item.id] || 0) + 1) }));
     setError("");
   }
+
+  useEffect(() => {
+    const onAdd = (event) => {
+      const item = event.detail;
+      if (item?.id && items.some((candidate) => candidate.id === item.id)) add(item);
+    };
+    window.addEventListener("kistet:add-to-order", onAdd);
+    return () => window.removeEventListener("kistet:add-to-order", onAdd);
+  }, [items]);
 
   function change(itemId, delta) {
     setCart((current) => {
