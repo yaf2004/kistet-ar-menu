@@ -1,46 +1,73 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production';
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters before the API can start.');
+  }
+  return secret;
+}
 
-// Step 1: confirm the person is logged in at all (any role)
 exports.protect = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'No token provided' });
+    const header = req.headers.authorization || '';
+    const [scheme, token] = header.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password');
-    if (!req.user) return res.status(401).json({ error: 'User not found' });
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+    if (!decoded.sub) return res.status(401).json({ error: 'Invalid authentication token' });
+
+    const user = await User.findById(decoded.sub).select('-password');
+    if (!user) return res.status(401).json({ error: 'Account is no longer available' });
+    if (user.role === 'restaurant_admin' && !user.restaurant) {
+      return res.status(403).json({ error: 'Restaurant account is not correctly configured' });
+    }
+
+    req.user = user;
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    next(err);
   }
 };
 
-// Step 2: only allow super_admins through (e.g. for "create restaurant")
 exports.requireSuperAdmin = (req, res, next) => {
-  if (req.user.role !== 'super_admin') {
+  if (req.user?.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super admin access required' });
   }
   next();
 };
 
-// Step 3: scope a restaurant_admin to ONLY their own restaurant.
-// super_admins are allowed through to anything (no restriction).
-// This is the core rule that keeps Restaurant A's owner from seeing Restaurant B's data.
-exports.scopeToOwnRestaurant = (req, res, next) => {
-  if (req.user.role === 'super_admin') return next(); // sees everything
+exports.canAccessRestaurant = (user, restaurantId) =>
+  user?.role === 'super_admin' || (
+    user?.role === 'restaurant_admin' &&
+    Boolean(user.restaurant) &&
+    String(user.restaurant) === String(restaurantId)
+  );
 
-  const requestedRestaurantId = req.params.restaurantId || req.body.restaurant;
+exports.scopeToOwnRestaurant = (req, res, next) => {
+  const requestedRestaurantId = req.params.restaurantId || req.params.id || req.body.restaurant;
   if (!requestedRestaurantId) {
     return res.status(400).json({ error: 'Restaurant ID required' });
   }
-  if (String(req.user.restaurant) !== String(requestedRestaurantId)) {
+  if (!exports.canAccessRestaurant(req.user, requestedRestaurantId)) {
     return res.status(403).json({ error: 'You do not have access to this restaurant' });
   }
   next();
 };
 
-exports.signToken = (id) =>
-  jwt.sign({ id }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES || '30d' });
+exports.signToken = (id) => jwt.sign(
+  { sub: String(id) },
+  getJwtSecret(),
+  {
+    algorithm: 'HS256',
+    expiresIn: process.env.JWT_EXPIRES || '15m',
+    issuer: process.env.JWT_ISSUER || 'kistet-ar-menu',
+    audience: process.env.JWT_AUDIENCE || 'kistet-ar-menu-web'
+  }
+);
