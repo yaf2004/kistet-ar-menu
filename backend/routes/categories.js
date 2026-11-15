@@ -53,6 +53,9 @@ router.post('/', protect, async (req, res, next) => {
     if (!canAccessRestaurant(req.user, restaurant)) {
       return res.status(403).json({ error: 'Not your restaurant' });
     }
+    if (!await Restaurant.exists({ _id: restaurant })) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
     const data = pickEditableFields(req.body);
     if (typeof data.name !== 'string' || !data.name.trim()) {
       return res.status(400).json({ error: 'Category name is required' });
