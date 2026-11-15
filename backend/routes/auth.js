@@ -93,7 +93,7 @@ router.post('/login', requireTrustedOrigin, loginAttemptLimiter, async (req, res
   } catch (err) { return next(err); }
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', protect, (req, res) => {
   clearSessionCookies(res);
   res.set('Cache-Control', 'no-store');
   return res.status(204).end();
