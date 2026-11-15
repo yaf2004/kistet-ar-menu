@@ -27,14 +27,18 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingModel, setUploadingModel] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingPhoto(true);
+    setUploadError('');
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file, fieldName: "image" });
       setForm(f => ({ ...f, image_url: file_url }));
+    } catch (error) {
+      setUploadError(error.message || 'Image upload failed');
     } finally {
       setUploadingPhoto(false);
     }
@@ -46,9 +50,12 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingModel(true);
+    setUploadError('');
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file, fieldName: "model3d" });
       setForm(f => ({ ...f, model_3d_url: file_url, ar_enabled: true }));
+    } catch (error) {
+      setUploadError(error.message || '3D model upload failed');
     } finally {
       setUploadingModel(false);
     }
@@ -152,7 +159,7 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           )}
           <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors text-sm text-stone-600">
             <Upload size={16} /> {uploadingModel ? "Uploading..." : "Upload .glb Model"}
-            <input type="file" accept=".glb,.gltf" className="hidden" onChange={handleModelUpload} />
+            <input type="file" accept=".glb" className="hidden" onChange={handleModelUpload} />
           </label>
         </div>
       </div>
@@ -171,6 +178,8 @@ export default function MenuItemForm({ item, categories, onSave, onCancel }) {
           <Label className="text-sm">AR Enabled {!form.model_3d_url && <span className="text-stone-400">(upload a model first)</span>}</Label>
         </div>
       </div>
+
+      {uploadError && <p role="alert" className="text-sm text-red-600">{uploadError}</p>}
 
       <div className="flex gap-3 pt-4 border-t">
         <Button type="submit" disabled={saving} className="bg-amber-600 hover:bg-amber-700">
