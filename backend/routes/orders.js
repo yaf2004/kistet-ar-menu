@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
+const MenuCategory = require('../models/MenuCategory');
 const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const orderCreationLimiter = require('../middleware/orderCreationLimiter');
@@ -74,11 +75,12 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
 
     const requested = normalizeRequestedItems(req.body.items);
     const ids = [...requested.keys()];
-    const menuItems = await MenuItem.find({
-      _id: { $in: ids },
-      restaurant: restaurant._id,
-      is_available: true
-    }).select('name price is_available').lean();
+    const menuItems = await MenuItem.aggregate([
+      { $match: { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) }, restaurant: restaurant._id, is_available: true } },
+      { $lookup: { from: 'menucategories', localField: 'category_id', foreignField: '_id', as: 'category' } },
+      { $match: { 'category.is_active': true } },
+      { $project: { name: 1, price: 1, is_available: 1 } }
+    ]);
     if (menuItems.length !== ids.length) {
       return res.status(409).json({ error: 'One or more selected items are unavailable. Refresh the menu and try again.' });
     }
