@@ -21,13 +21,30 @@ const filters = ["all", "new", "accepted", "preparing", "ready", "completed", "c
 
 export default function AdminOrders() {
   const { user } = useAuth();
-  const restaurantId = user?.restaurant?._id || user?.restaurant?.id || user?.restaurant;
+  const isSuperAdmin = user?.role === "super_admin";
+  const ownRestaurantId = user?.restaurant?._id || user?.restaurant?.id || user?.restaurant;
+  const [restaurants, setRestaurants] = useState([]);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState("");
+  const restaurantId = isSuperAdmin ? selectedRestaurantId : ownRestaurantId;
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState("new");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    apiClient.request("/api/restaurants")
+      .then((data) => {
+        if (cancelled) return;
+        setRestaurants(data || []);
+        setSelectedRestaurantId((current) => current || data?.[0]?._id || data?.[0]?.id || "");
+      })
+      .catch((err) => { if (!cancelled) setError(err.message || "Could not load restaurants"); });
+    return () => { cancelled = true; };
+  }, [isSuperAdmin]);
 
   const loadOrders = useCallback(async (silent = false) => {
     if (!restaurantId) {
@@ -77,10 +94,22 @@ export default function AdminOrders() {
 
   if (!restaurantId) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
+      <div className="rounded-2xl border border-stone-200 bg-white p-8">
         <ClipboardList className="mx-auto mb-3 text-stone-400" size={32} />
-        <h1 className="text-xl font-bold text-stone-900">Orders</h1>
-        <p className="mt-2 text-sm text-stone-500">Select a restaurant context to manage its orders. Restaurant accounts see their own orders automatically.</p>
+        <h1 className="text-center text-xl font-bold text-stone-900">Orders</h1>
+        {isSuperAdmin ? (
+          <label className="mx-auto mt-4 block max-w-sm text-sm font-medium text-stone-700">
+            Select a restaurant
+            <select value={selectedRestaurantId} onChange={(event) => setSelectedRestaurantId(event.target.value)} className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5">
+              <option value="">Choose a restaurant</option>
+              {restaurants.map((restaurant) => (
+                <option key={restaurant._id || restaurant.id} value={restaurant._id || restaurant.id}>{restaurant.name}{restaurant.active ? "" : " (inactive)"}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="mt-2 text-center text-sm text-stone-500">Your restaurant account is not linked to a restaurant.</p>
+        )}
       </div>
     );
   }
@@ -96,6 +125,13 @@ export default function AdminOrders() {
           <h1 className="text-2xl font-bold text-stone-900">Order management</h1>
           <p className="mt-1 text-sm text-stone-500">Live queue · refreshes every 15 seconds</p>
         </div>
+        {isSuperAdmin && (
+          <select value={selectedRestaurantId} onChange={(event) => setSelectedRestaurantId(event.target.value)} className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm">
+            {restaurants.map((restaurant) => (
+              <option key={restaurant._id || restaurant.id} value={restaurant._id || restaurant.id}>{restaurant.name}{restaurant.active ? "" : " (inactive)"}</option>
+            ))}
+          </select>
+        )}
         <button type="button" onClick={() => loadOrders(true)} disabled={refreshing} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 disabled:opacity-50">
           <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} /> Refresh
         </button>
