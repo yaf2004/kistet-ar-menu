@@ -99,7 +99,6 @@ export default function ARViewer({ item, onClose }) {
             shadow-softness="0.8"
             exposure="1"
             skybox-image={AR_SKYBOX_URL}
-            skybox-height="1.5m"
             loading="eager"
             reveal="auto"
             touch-action="pan-y"
