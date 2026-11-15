@@ -17,7 +17,7 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getJwtSecret(), {\n      algorithms: ['HS256'],\n      issuer: process.env.JWT_ISSUER || 'kistet-ar-menu',\n      audience: process.env.JWT_AUDIENCE || 'kistet-ar-menu-web'\n    });
     if (!decoded.sub) return res.status(401).json({ error: 'Invalid authentication token' });
 
     const user = await User.findById(decoded.sub).select('-password');
