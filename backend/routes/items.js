@@ -143,8 +143,10 @@ router.get('/public/:restaurantId', async (req, res, next) => {
     if (!await Restaurant.exists({ _id: req.params.restaurantId, active: true })) {
       return res.status(404).json({ error: 'Restaurant not found' });
     }
+    const activeCategories = await MenuCategory.find({ restaurant: req.params.restaurantId, is_active: true }).distinct('_id');
     const items = await MenuItem.find({
       restaurant: req.params.restaurantId,
+      category_id: { $in: activeCategories },
       is_available: true
     }).select('category_id name description price image_url is_featured ar_enabled model_3d_url tags allergens ingredients sort_order')
       .sort({ sort_order: 1, name: 1 }).lean();
