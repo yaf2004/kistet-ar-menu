@@ -51,7 +51,7 @@ function validateFileSignature(file) {
   if (ext === 'jpg' || ext === 'jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (ext === 'png') return b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   if (ext === 'webp') return b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP';
-  if (ext === 'glb') return b.toString('ascii', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2;
+  if (ext === 'glb') return b.length >= 12 && b.toString('ascii', 0, 4) === 'glTF' && b.readUInt32LE(4) === 2;
   return false;
 }
 
