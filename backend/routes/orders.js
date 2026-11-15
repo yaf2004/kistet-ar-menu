@@ -8,6 +8,7 @@ const Restaurant = require('../models/Restaurant');
 const { protect, canAccessRestaurant } = require('../middleware/auth');
 const orderCreationLimiter = require('../middleware/orderCreationLimiter');
 const { ORDER_TRANSITIONS, canTransitionOrder } = require('../lib/orderState');
+const { enforceLimit } = require('../lib/tenantEntitlements');
 
 function hash(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -72,6 +73,12 @@ router.post('/:slug', orderCreationLimiter, async (req, res, next) => {
         replayed: true
       });
     }
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthlyOrders = await Order.countDocuments({ restaurant: restaurant._id, createdAt: { $gte: monthStart } });
+    await enforceLimit(restaurant._id, 'monthlyOrders', monthlyOrders);
 
     const requested = normalizeRequestedItems(req.body.items);
     const ids = [...requested.keys()];
