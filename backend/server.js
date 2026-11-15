@@ -7,7 +7,8 @@ const models = [
   require('./models/MenuItem'),
   require('./models/MenuCategory'),
   require('./models/LoginAttempt'),
-  require('./models/Order')
+  require('./models/Order'),
+  require('./models/RateLimitBucket')
 ];
 
 async function start() {
