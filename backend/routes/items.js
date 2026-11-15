@@ -112,6 +112,9 @@ router.get('/public/:restaurantId', async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.restaurantId)) {
       return res.status(400).json({ error: 'Invalid restaurant ID' });
     }
+    if (!await Restaurant.exists({ _id: req.params.restaurantId, active: true })) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
     const items = await MenuItem.find({
       restaurant: req.params.restaurantId,
       is_available: true
@@ -184,6 +187,8 @@ router.put('/:id', protect,
       }
 
       const data = pickEditableFields(req.body);
+      if (req.body.image_url === '') data.image_url = undefined;
+      if (req.body.model_3d_url === '') data.model_3d_url = undefined;
       if (Object.prototype.hasOwnProperty.call(data, 'name')) {
         if (typeof data.name !== 'string' || !data.name.trim()) {
           return res.status(400).json({ error: 'Item name cannot be empty' });
