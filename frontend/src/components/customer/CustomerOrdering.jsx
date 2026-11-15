@@ -132,6 +132,7 @@ export default function CustomerOrdering({ restaurantSlug, tableNumber, items, c
                   <p className="mt-1 text-sm">{statusLabels[tracking.status] || tracking.status}</p>
                   <p className="mt-2 text-sm">Total: {currency}{Number(tracking.total).toFixed(2)}</p>
                 </div>
+                {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
                 <div className="space-y-2">
                   {tracking.items?.map((line, index) => (
                     <div key={index} className="flex justify-between gap-3 text-sm">
